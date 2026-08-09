@@ -1,0 +1,20 @@
+{
+  "font_path": "res://assets/ui/fonts/Baloo2.ttf",
+  "font_size_default": 26,
+  "font_size_title": 40,
+  "font_weight": 800,
+  "colors": {
+    "background": "#6FA84F",
+    "panel": "#FFF4DF",
+    "panel_border": "#8B5E3C",
+    "text_primary": "#3A2E28",
+    "text_secondary": "#7A6A58",
+    "accent": "#E9718F",
+    "accent_gold": "#F2B138",
+    "positive": "#58A14E",
+    "disabled": "#D8CFC0"
+  },
+  "radius": { "chip": 8, "button": 12, "card": 16, "panel": 20, "popup": 24 },
+  "border": { "button": 2, "panel": 3 },
+  "panel_padding": 16
+}

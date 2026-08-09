@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/fbrmp/Projekte/game-factory/**)",
+      "Read(//c/Users/fbrmp/Projekte/godot-idle-game/**)",
+      "mcp__gamedev-mcp__list_projects",
+      "mcp__gamedev-mcp__list_tools_repo",
+      "Bash(ls -lh \"C:\\\\Users\\\\fbrmp\\\\Projekte\\\\godot-idle-game/scenes\"/*.tscn)",
+      "Bash(ls -lh \"C:\\\\Users\\\\fbrmp\\\\Projekte\\\\godot-idle-game/tests\"/*.tscn)",
+      "Read(//c/Users/fbrmp/Projekte/ProjectKanban/Kanban/**)",
+      "Bash(pip install Pillow -q)",
+      "Bash(python3 -m pip install Pillow)",
+      "Bash(python -c \"from PIL import Image; print\\(''OK''\\)\")",
+      "Read(//c/Users/fbrmp/Desktop/GodotExample/assets/Godot/**)",
+      "Bash(\"C:/Users/fbrmp/Desktop/GodotExample/assets/Godot/Godot_v4.6-stable_win64_console.exe\" --headless --script tests/test_runner.gd)",
+      "Bash(python -c \":*)",
+      "Bash(timeout 20 \"/c/Users/fbrmp/Desktop/GodotExample/assets/Godot/Godot_v4.6-stable_win64_console.exe\" --headless --script tests/test_runner.gd)",
+      "Read(//c/Users/fbrmp/.claude/plans/**)",
+      "Bash(\"/c/Users/fbrmp/Desktop/GodotExample/assets/Godot/Godot_v4.6-stable_win64_console.exe\" --headless --script tests/test_runner.gd)",
+      "Bash(\"/c/Users/fbrmp/Desktop/GodotExample/assets/Godot/Godot_v4.6-stable_win64_console.exe\" --headless --import)",
+      "Bash(python3 -c \"from PIL import Image; print\\(''Pillow available''\\)\")",
+      "Bash(python -c \"from PIL import Image; print\\(''Pillow available''\\)\")",
+      "Bash(wc -l tests/*.gd)",
+      "Bash(\"C:/Users/fbrmp/Desktop/GodotExample/assets/Godot/Godot_v4.6-stable_win64_console.exe\" --headless --import)",
+      "Bash(python3 -c \":*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\fbrmp\\.claude\\projects\\c--Users-fbrmp-Projekte-VoiceZoo",
+      "c:\\Users\\fbrmp\\.claude\\plans"
+    ]
+  }
+}

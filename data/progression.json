@@ -1,0 +1,12 @@
+{
+  "milestones": [
+    { "threshold": 0,      "unlock_type": "chicken",   "zone": "farm" },
+    { "threshold": 200,    "unlock_type": "dog",       "zone": "farm" },
+    { "threshold": 1000,   "unlock_type": "cat",       "zone": "farm" },
+    { "threshold": 4000,   "unlock_type": "parrot",    "zone": "tropical" },
+    { "threshold": 12000,  "unlock_type": "monkey",    "zone": "tropical" },
+    { "threshold": 35000,  "unlock_type": "penguin",   "zone": "arctic" },
+    { "threshold": 100000, "unlock_type": "lion",      "zone": "savanna" },
+    { "threshold": 300000, "unlock_type": "elephant",  "zone": "savanna" }
+  ]
+}

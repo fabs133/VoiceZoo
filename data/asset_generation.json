@@ -1,0 +1,23 @@
+{
+  "defaults": {
+    "model": "gpt-image-1.5",
+    "size": "1024x1024",
+    "background": "transparent",
+    "candidates": 1,
+    "reference_image": "assets/generated/anchors/anchor.png",
+    "output_dir": "assets/generated/animals"
+  },
+  "style_template": "A cute {subject}. 3/4 top-down view as in cozy farming games, character seen slightly from above, facing slightly left. Flat cel shading with at most two shadow tones, no gradients, no photorealism, no painterly texture. Thick rounded dark warm-brown outline (#3A2E28) with uniform weight. Warm cozy palette built on cream, wood brown and leaf green. Soft key light from the top left. Big simple readable silhouette, no fine details. Single subject centered, filling about 80% of the canvas height, feet resting on a level ground line at about 88% of canvas height. No text, no watermark, no background elements, no cast shadow on the ground. Transparent background.",
+  "subjects": [
+    { "id": "monkey",   "enabled": true,  "subject": "small monkey sitting, long curled tail visible, holding one hand up" },
+    { "id": "penguin",  "enabled": true,  "subject": "plump penguin standing upright, flippers slightly out" },
+    { "id": "elephant", "enabled": true,  "subject": "young elephant, trunk raised slightly, big friendly ears" },
+    { "id": "dog",      "enabled": true,  "subject": "small fluffy Maltese dog, white coat with dark patches, happy expression, tail up",
+      "note": "confirm patch placement against a photo before curating" },
+    { "id": "cat",      "enabled": false, "subject": "COLORING-TBD shorthair cat sitting upright, tail curled around its paws",
+      "note": "BLOCKED: coloring unknown - ask the couple, then set enabled=true and fix the subject line" },
+    { "id": "chicken",  "enabled": false, "note": "anchor already approved - reuse the raw anchor PNG directly" },
+    { "id": "lion",     "enabled": false, "note": "anchor already approved" },
+    { "id": "parrot",   "enabled": false, "note": "anchor already approved" }
+  ]
+}

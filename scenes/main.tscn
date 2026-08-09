@@ -1,0 +1,32 @@
+[gd_scene load_steps=9 format=3 uid="uid://bkcsbcqrpn3u"]
+
+[ext_resource type="Script" path="res://presentation/main.gd" id="1_main"]
+[ext_resource type="PackedScene" uid="uid://cjs6vri81em3y" path="res://scenes/zoo_map.tscn" id="2_zoo_map"]
+[ext_resource type="Script" path="res://presentation/zoo_camera.gd" id="3_camera"]
+[ext_resource type="PackedScene" path="res://scenes/ui/shop_panel.tscn" id="4_shop"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/entity_info.tscn" id="6_info"]
+[ext_resource type="PackedScene" path="res://scenes/ui/unlock_popup.tscn" id="7_unlock"]
+[ext_resource type="PackedScene" path="res://scenes/ui/keeper_assign_panel.tscn" id="8_keeper"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="ZooMap" parent="." instance=ExtResource("2_zoo_map")]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(768, 960)
+script = ExtResource("3_camera")
+
+[node name="UI" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="HUD" parent="UI" instance=ExtResource("5_hud")]
+
+[node name="ShopPanel" parent="UI" instance=ExtResource("4_shop")]
+
+[node name="EntityInfo" parent="UI" instance=ExtResource("6_info")]
+
+[node name="UnlockPopup" parent="UI" instance=ExtResource("7_unlock")]
+
+[node name="KeeperAssignPanel" parent="UI" instance=ExtResource("8_keeper")]

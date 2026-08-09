@@ -1,0 +1,52 @@
+{
+  "feed": {
+    "name": "Füttern",
+    "duration": 3.0,
+    "cooldown": 15.0,
+    "income_multiplier": 2.0,
+    "keeper_action": "feed",
+    "entity_reaction": "happy",
+    "personalities": ["friendly", "calm"],
+    "zones": ["farm", "tropical", "arctic", "savanna"]
+  },
+  "play": {
+    "name": "Spielen",
+    "duration": 4.0,
+    "cooldown": 20.0,
+    "income_multiplier": 2.5,
+    "keeper_action": "play",
+    "entity_reaction": "excited",
+    "personalities": ["playful", "friendly"],
+    "zones": ["farm", "tropical", "arctic", "savanna"]
+  },
+  "train": {
+    "name": "Training",
+    "duration": 5.0,
+    "cooldown": 25.0,
+    "income_multiplier": 3.0,
+    "keeper_action": "train",
+    "entity_reaction": "focused",
+    "personalities": ["strict"],
+    "zones": ["tropical", "savanna"]
+  },
+  "groom": {
+    "name": "Pflegen",
+    "duration": 3.5,
+    "cooldown": 18.0,
+    "income_multiplier": 1.8,
+    "keeper_action": "groom",
+    "entity_reaction": "relaxed",
+    "personalities": ["calm", "friendly"],
+    "zones": ["farm", "arctic", "savanna"]
+  },
+  "observe": {
+    "name": "Beobachten",
+    "duration": 6.0,
+    "cooldown": 30.0,
+    "income_multiplier": 1.5,
+    "keeper_action": "observe",
+    "entity_reaction": "curious",
+    "personalities": ["calm", "strict"],
+    "zones": ["farm", "tropical", "arctic", "savanna"]
+  }
+}

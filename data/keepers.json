@@ -1,0 +1,27 @@
+{
+  "body_types": {
+    "default": {
+      "sprite": "res://assets/placeholder_sprites/keeper_body_default.png",
+      "head_offset": [0, -48],
+      "head_scale": [1.4, 1.4]
+    },
+    "tall": {
+      "sprite": "res://assets/placeholder_sprites/keeper_body_tall.png",
+      "head_offset": [0, -56],
+      "head_scale": [1.3, 1.3]
+    },
+    "small": {
+      "sprite": "res://assets/placeholder_sprites/keeper_body_small.png",
+      "head_offset": [0, -40],
+      "head_scale": [1.5, 1.5]
+    }
+  },
+  "faces": [
+    "res://assets/placeholder_sprites/keeper_face_1.png",
+    "res://assets/placeholder_sprites/keeper_face_2.png",
+    "res://assets/placeholder_sprites/keeper_face_3.png",
+    "res://assets/placeholder_sprites/keeper_face_4.png"
+  ],
+  "personalities": ["friendly", "strict", "playful", "calm"],
+  "income_bonus": 0.5
+}

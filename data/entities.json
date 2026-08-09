@@ -1,0 +1,90 @@
+{
+  "chicken": {
+    "name": "Huhn",
+    "base_income": 1.0,
+    "base_cost": 10.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 5.0,
+    "sprite": "res://assets/sprites/animals/chicken.png",
+    "sprite_size": 80,
+    "default_sound": "res://assets/placeholder_sounds/chicken.wav",
+    "zone": "farm"
+  },
+  "dog": {
+    "name": "Hund",
+    "base_income": 3.0,
+    "base_cost": 50.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 7.0,
+    "sprite": "res://assets/sprites/animals/dog.png",
+    "sprite_size": 96,
+    "default_sound": "res://assets/placeholder_sounds/pig.wav",
+    "zone": "farm"
+  },
+  "cat": {
+    "name": "Katze",
+    "base_income": 8.0,
+    "base_cost": 200.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 10.0,
+    "sprite": "res://assets/placeholder_sprites/cow.png",
+    "sprite_size": 88,
+    "default_sound": "res://assets/placeholder_sounds/cow.wav",
+    "zone": "farm"
+  },
+  "parrot": {
+    "name": "Papagei",
+    "base_income": 20.0,
+    "base_cost": 800.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 4.0,
+    "sprite": "res://assets/sprites/animals/parrot.png",
+    "sprite_size": 84,
+    "default_sound": "res://assets/placeholder_sounds/parrot.wav",
+    "zone": "tropical"
+  },
+  "monkey": {
+    "name": "Affe",
+    "base_income": 50.0,
+    "base_cost": 2500.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 6.0,
+    "sprite": "res://assets/sprites/animals/monkey.png",
+    "sprite_size": 100,
+    "default_sound": "res://assets/placeholder_sounds/monkey.wav",
+    "zone": "tropical"
+  },
+  "penguin": {
+    "name": "Pinguin",
+    "base_income": 120.0,
+    "base_cost": 8000.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 8.0,
+    "sprite": "res://assets/sprites/animals/penguin.png",
+    "sprite_size": 92,
+    "default_sound": "res://assets/placeholder_sounds/penguin.wav",
+    "zone": "arctic"
+  },
+  "lion": {
+    "name": "Löwe",
+    "base_income": 300.0,
+    "base_cost": 25000.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 12.0,
+    "sprite": "res://assets/sprites/animals/lion.png",
+    "sprite_size": 112,
+    "default_sound": "res://assets/placeholder_sounds/lion.wav",
+    "zone": "savanna"
+  },
+  "elephant": {
+    "name": "Elefant",
+    "base_income": 800.0,
+    "base_cost": 80000.0,
+    "cost_exponent": 1.15,
+    "sound_interval": 15.0,
+    "sprite": "res://assets/sprites/animals/elephant.png",
+    "sprite_size": 128,
+    "default_sound": "res://assets/placeholder_sounds/elephant.wav",
+    "zone": "savanna"
+  }
+}

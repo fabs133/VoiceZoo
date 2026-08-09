@@ -1,0 +1,40 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://presentation/ui/hud.gd" id="1_hud"]
+
+[node name="HUD" type="PanelContainer"]
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+custom_minimum_size = Vector2(0, 80)
+script = ExtResource("1_hud")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="TopRow" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="CoinsLabel" type="Label" parent="VBoxContainer/TopRow"]
+layout_mode = 2
+text = "100 Münzen"
+horizontal_alignment = 1
+
+[node name="IncomeLabel" type="Label" parent="VBoxContainer/TopRow"]
+layout_mode = 2
+text = "+0/s"
+horizontal_alignment = 1
+
+[node name="BoostLabel" type="Label" parent="VBoxContainer/TopRow"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+visible = false
+
+[node name="GoalLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Nächstes Ziel: Schwein"
+horizontal_alignment = 1

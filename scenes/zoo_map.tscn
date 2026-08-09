@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://cjs6vri81em3y"]
+
+[ext_resource type="Script" path="res://presentation/zoo_map.gd" id="1_zoo_map"]
+
+[node name="ZooMap" type="Node2D"]
+script = ExtResource("1_zoo_map")
+
+[node name="TileMapLayer" type="TileMapLayer" parent="."]
+_import_path = NodePath("")
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+editor_description = ""
+script = null
+
+[node name="Entities" type="Node2D" parent="."]
+y_sort_enabled = true

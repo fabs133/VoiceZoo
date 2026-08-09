@@ -1,0 +1,25 @@
+{
+  "bpm": 90.0,
+  "steps_per_loop": 8,
+  "voice_cap": 6,
+  "voice_length_steps": 2.0,
+  "tempo_presets": [
+    { "id": "very_cozy", "label": "Ganz gemütlich", "bpm": 60.0 },
+    { "id": "cozy", "label": "Gemütlich", "bpm": 75.0 },
+    { "id": "normal", "label": "Normal", "bpm": 90.0 },
+    { "id": "brisk", "label": "Flott", "bpm": 105.0 },
+    { "id": "party", "label": "Party", "bpm": 120.0 }
+  ],
+  "pitch_rotation": [0.0, 3.0, 5.0, 7.0, 12.0],
+  "default_patterns": {
+    "chicken": [0, 4],
+    "dog": [2],
+    "cat": [6],
+    "parrot": [1, 5],
+    "monkey": [3],
+    "penguin": [7],
+    "lion": [0],
+    "elephant": [4]
+  },
+  "fallback_pattern": [0]
+}
