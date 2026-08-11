@@ -41,7 +41,10 @@ var _beat_audio: AudioStreamPlayer2D
 func _ready() -> void:
 	_beat_audio = AudioStreamPlayer2D.new()
 	_beat_audio.name = "BeatAudio"
-	_beat_audio.volume_db = -3.0
+	# The singing voice is the point of the game, so it runs at unity rather
+	# than the -3 dB it used to sit at. Loudness is managed once, on the master
+	# bus (main.gd), instead of by trimming each source.
+	_beat_audio.volume_db = 0.0
 	# Match the interaction player's spatial falloff, which is tuned in the
 	# scene file. Godot's defaults (2000 / 1.0) would make the singing voice
 	# audible across the whole map - one source of truth, no magic numbers.

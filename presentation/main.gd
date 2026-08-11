@@ -35,6 +35,7 @@ var _recording_entity: EntityData  # entity the open record dialog belongs to
 
 func _ready() -> void:
 	_apply_dev_audio_override()
+	_setup_master_bus()
 	zoo_state = ZooState.new()
 
 	# Config BEFORE the save: rhythm.json supplies the loop shape and the caps,
@@ -164,6 +165,47 @@ func set_tempo(bpm: float) -> void:
 	zoo_state.rhythm.bpm = bpm
 	_apply_voice_length_cap()
 	_save_game()  # cheap since SoundStore only writes sounds it has not written
+
+
+## Phone speakers at a party are the target, and peak normalization alone does
+## not get there: a voice recording normalized to 0.9 has loud transients and a
+## quiet body, so it measures full-scale and still sounds thin. Compression
+## lifts the body, the limiter catches what that pushes over, and the bus gain
+## is what actually makes it loud.
+##
+## Done once on the master bus rather than by raising each source, so recordings,
+## placeholders and interaction sounds all benefit and their balance is
+## untouched. The ceiling sits below 0 dBFS because six animals landing on the
+## same beat would otherwise sum into clipping, which reads as broken, not loud.
+func _setup_master_bus() -> void:
+	var master := AudioServer.get_bus_index("Master")
+	if master < 0:
+		return
+	# Idempotent: this scene can be reloaded, and the effects would stack.
+	if AudioServer.get_bus_effect_count(master) > 0:
+		return
+
+	var comp := AudioEffectCompressor.new()
+	comp.threshold = -18.0
+	comp.ratio = 4.0
+	comp.attack_us = 20.0
+	comp.release_ms = 250.0
+	comp.gain = 6.0
+	AudioServer.add_bus_effect(master, comp)
+
+	# AudioEffectHardLimiter is the 4.3+ replacement; fall back where it is not
+	# compiled in rather than shipping a compressor with nothing catching it.
+	var limiter: AudioEffect = null
+	if ClassDB.can_instantiate("AudioEffectHardLimiter"):
+		limiter = ClassDB.instantiate("AudioEffectHardLimiter")
+		limiter.set("ceiling_db", -0.5)
+	elif ClassDB.can_instantiate("AudioEffectLimiter"):
+		limiter = ClassDB.instantiate("AudioEffectLimiter")
+		limiter.set("ceiling_db", -0.5)
+	if limiter != null:
+		AudioServer.add_bus_effect(master, limiter)
+
+	AudioServer.set_bus_volume_db(master, 3.0)
 
 
 func _apply_voice_length_cap() -> void:

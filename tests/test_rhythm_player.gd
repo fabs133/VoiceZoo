@@ -27,6 +27,65 @@ func before_each() -> void:
 	_player.setup(_entity_sprites)
 
 
+## The zoo has to sound like one piece of music from anywhere on the map.
+## AudioStreamPlayer2D does not fade past max_distance - it MUTES. With that set
+## to 800 on a 1536x1920 map, an animal measured 1013 units from the listener
+## played at -100 dB, so most of the zoo was silent rather than quiet, and a
+## guest's recording appeared not to work at all.
+##
+## Both files are read as TEXT rather than preloaded: entity_sprite.gd and
+## zoo_map.gd reference the Config autoload, which does not exist under
+## `godot --script`, so loading either here would only produce a compile error.
+func test_the_singing_voice_carries_across_the_whole_map() -> void:
+	var scene := _read_file("res://scenes/entity_sprite.tscn")
+	var max_distance := _property(scene, "max_distance")
+	var attenuation := _property(scene, "attenuation")
+	assert_gt(max_distance, 0.0, "entity_sprite.tscn declares max_distance")
+	assert_gt(attenuation, 0.0, "entity_sprite.tscn declares attenuation")
+
+	var map := _read_file("res://presentation/zoo_map.gd")
+	var tile := _constant(map, "TILE_SIZE")
+	var map_size := Vector2(
+		_constant(map, "MAP_WIDTH") * tile,
+		_constant(map, "MAP_HEIGHT") * tile
+	)
+	assert_gt(map_size.length(), 0.0, "zoo_map.gd declares its dimensions")
+	# Worst case: listener and animal at opposite corners of the map.
+	var worst := map_size.length()
+	assert_gt(max_distance, worst,
+		"max_distance (%.0f) must exceed the map diagonal (%.0f) or far animals are muted outright"
+			% [max_distance, worst])
+
+	# And the roll-off inside that range has to stay gentle enough to hear.
+	var mult: float = pow(maxf(1.0 - worst / max_distance, 0.0), attenuation)
+	assert_gt(mult, 0.5,
+		"the far corner plays at %.2fx (%.1f dB) - too quiet to read as part of the loop"
+			% [mult, linear_to_db(maxf(mult, 0.00001))])
+
+
+func _read_file(path: String) -> String:
+	var f := FileAccess.open(path, FileAccess.READ)
+	return f.get_as_text() if f != null else ""
+
+
+## Value of a `name = number` line in a .tscn. Anchored to the start of a line
+## so prose in a comment ("max_distance was 800") cannot be read as the setting.
+func _property(text: String, name: String) -> float:
+	return _first_number(text, "(?m)^\\s*%s\\s*=\\s*([0-9]+(?:\\.[0-9]+)?)" % name)
+
+
+## Value of a `const NAME := number` line in a .gd file.
+func _constant(text: String, name: String) -> float:
+	return _first_number(text, "(?m)^\\s*const\\s+%s\\s*:=\\s*([0-9]+(?:\\.[0-9]+)?)" % name)
+
+
+func _first_number(text: String, pattern: String) -> float:
+	var rx := RegEx.new()
+	rx.compile(pattern)
+	var m := rx.search(text)
+	return float(m.get_string(1)) if m != null else 0.0
+
+
 func _trigger(entity_id: String, step: int, pitch_scale: float = 1.0) -> Dictionary:
 	return {"entity_id": entity_id, "step": step, "pitch_scale": pitch_scale}
 

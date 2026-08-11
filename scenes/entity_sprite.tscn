@@ -8,8 +8,15 @@ script = ExtResource("1_entity")
 [node name="Sprite2D" type="Sprite2D" parent="."]
 
 [node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="."]
-max_distance = 800.0
-attenuation = 1.5
+; The map is 24x30 tiles of 64px = 1536x1920 world units, and the camera pans
+; freely, so an animal can sit ~2460 units from the listener (opposite corners).
+; max_distance was 800 with an attenuation of 1.5: past 800 Godot mutes the
+; source outright, which measured as -100 dB on an animal only 1013 units away -
+; most of the zoo was silent rather than quiet. 4000 puts the silence cliff well
+; outside anything reachable, and 0.3 keeps the far corner within ~2.5 dB of the
+; near one, so the loop stays a single piece of music while panning still works.
+max_distance = 4000.0
+attenuation = 0.3
 
 [node name="Label" type="Label" parent="."]
 offset_left = -30.0
