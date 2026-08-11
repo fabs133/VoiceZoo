@@ -159,24 +159,84 @@ try {
         Invoke-Tolerant { git worktree prune }
     }
 
-    # --- 5/5 Report ----------------------------------------------------------
+    # --- 5/5 Verify the live site -------------------------------------------
+    # A successful push is not a working site. The Pages site config is separate
+    # from the branch and can be absent (never enabled, or switched off in
+    # Settings), in which case every URL 404s while git reports total success.
+    # Confirm the deploy actually reached the public URL before claiming victory.
     $originUrl = (git remote get-url $Remote).Trim()
     if ($originUrl -match '[:/]([^/]+)/([^/]+?)(?:\.git)?$') {
         $owner = $Matches[1]; $repo = $Matches[2]
         $siteUrl = "https://$owner.github.io/$repo/"
     } else {
-        $siteUrl = '(could not derive the URL from the origin remote)'
+        $owner = $null; $repo = $null
+        $siteUrl = $null
     }
 
     Write-Host ''
-    Write-Host '=== 5/5 Deployed ===' -ForegroundColor Green
-    Write-Host "  $siteUrl" -ForegroundColor Green
-    Write-Host "  ${siteUrl}mic_test.html" -ForegroundColor Green
+    Write-Host '=== 5/5 Verifying the live site ===' -ForegroundColor Cyan
+
+    if (-not $siteUrl) {
+        Write-Host "Could not derive the site URL from '$originUrl' - skipping verification." -ForegroundColor Yellow
+        exit 0
+    }
+
+    $pagesHint = "Settings -> Pages -> Deploy from a branch -> $Branch -> / (root)"
+
+    # Cheap pre-check: if the Pages site does not exist, say so precisely rather
+    # than letting the user guess at a 404. --jq keeps this to plain strings;
+    # parsing into an object would trip Set-StrictMode the moment gh returns an
+    # error payload instead of the repo.
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+        $hasPages = ''
+        $isPrivate = ''
+        Invoke-Tolerant { $script:hasPages  = (gh api "repos/$owner/$repo" --jq '.has_pages') }
+        Invoke-Tolerant { $script:isPrivate = (gh api "repos/$owner/$repo" --jq '.private') }
+        if ($hasPages -eq 'false') {
+            Write-Host 'Pages is NOT enabled for this repository.' -ForegroundColor Red
+            Write-Host "  Enable it once under: $pagesHint" -ForegroundColor Yellow
+        }
+        if ($isPrivate -eq 'true') {
+            Write-Host 'Repository is PRIVATE - free GitHub Pages will not serve it.' -ForegroundColor Red
+        }
+    }
+
+    if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
+        Write-Host "curl.exe not found - skipping the live check. Open $siteUrl yourself." -ForegroundColor Yellow
+        exit 0
+    }
+
+    # Pages rebuilds asynchronously after the push, so poll rather than fire once.
+    $urls = @{ 'index.html' = $siteUrl; 'mic_test.html' = "${siteUrl}mic_test.html" }
+    $deadline = (Get-Date).AddMinutes(3)
+    $live = $false
+    while ((Get-Date) -lt $deadline) {
+        $codes = @{}
+        foreach ($name in $urls.Keys) {
+            $codes[$name] = (curl.exe -s -o NUL -w '%{http_code}' $urls[$name])
+        }
+        if ($codes['index.html'] -eq '200' -and $codes['mic_test.html'] -eq '200') { $live = $true; break }
+        Write-Host ("  waiting for Pages... index.html={0} mic_test.html={1}" -f $codes['index.html'], $codes['mic_test.html'])
+        Start-Sleep -Seconds 15
+    }
+    $global:LASTEXITCODE = 0
+
     Write-Host ''
-    Write-Host 'If this is the first deploy, enable it once under' -ForegroundColor Yellow
-    Write-Host "  Settings -> Pages -> Deploy from a branch -> $Branch -> / (root)" -ForegroundColor Yellow
-    Write-Host 'Free GitHub Pages requires the repository to be public.' -ForegroundColor Yellow
-    exit 0
+    if ($live) {
+        Write-Host '=== Deployed and live ===' -ForegroundColor Green
+        Write-Host "  $siteUrl" -ForegroundColor Green
+        Write-Host "  ${siteUrl}mic_test.html" -ForegroundColor Green
+        exit 0
+    }
+
+    Write-Host '=== Pushed, but the site is NOT serving ===' -ForegroundColor Red
+    Write-Host "  $siteUrl" -ForegroundColor Red
+    Write-Host ''
+    Write-Host 'The gh-pages branch was pushed successfully, so this is a Pages' -ForegroundColor Yellow
+    Write-Host 'configuration problem, not a build problem. Check:' -ForegroundColor Yellow
+    Write-Host "  $pagesHint" -ForegroundColor Yellow
+    Write-Host '  and that the repository is public.' -ForegroundColor Yellow
+    exit 1
 }
 finally {
     Pop-Location
