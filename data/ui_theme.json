@@ -1,5 +1,6 @@
 {
   "font_path": "res://assets/ui/fonts/Baloo2.ttf",
+  "emoji_font_path": "res://assets/ui/fonts/NotoEmoji-subset.ttf",
   "font_size_default": 26,
   "font_size_title": 40,
   "font_weight": 800,

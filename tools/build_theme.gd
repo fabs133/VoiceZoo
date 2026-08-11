@@ -40,6 +40,31 @@ func _init() -> void:
 		var ts = TextServerManager.get_primary_interface()
 		fv.variation_opentype = { ts.name_to_tag("wght"): int(tokens["font_weight"]) }
 		font = fv
+
+	# Emoji fallback. Baloo 2 covers no emoji, and a web export has no system
+	# font to borrow one from the way the desktop build does, so every emoji in
+	# the UI rendered as a tofu box on the deployed game while looking fine in
+	# the editor. The fallback is a ~2 KB subset containing only the glyphs the
+	# sources actually use - see tools/build_emoji_font.py, which rebuilds it and
+	# rediscovers the codepoints.
+	var emoji_path: String = str(tokens.get("emoji_font_path", ""))
+	if emoji_path != "":
+		var emoji_font = load(emoji_path)
+		if emoji_font == null:
+			push_error("emoji font not imported yet - run --headless --import first")
+			quit(1)
+			return
+		if font is FontVariation:
+			font.fallbacks = [emoji_font]
+		else:
+			# Never write fallbacks onto the imported FontFile itself - that
+			# resource is shared, and the change would leak into every other
+			# user of it. Wrap it instead.
+			var wrapper := FontVariation.new()
+			wrapper.base_font = font
+			wrapper.fallbacks = [emoji_font]
+			font = wrapper
+
 	theme.default_font = font
 	theme.default_font_size = int(tokens["font_size_default"])
 	# Explicit per-type items: the engine default theme defines ("font", type)
