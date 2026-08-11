@@ -262,13 +262,14 @@ window.__vz_mic_boot_error = '';
 ## The bootstrap is idempotent, so re-evaluating it is cheap and safe. Testing
 ## for a callable rather than for 'object' is the point: a partially-thrown
 ## bootstrap leaves the object there with the methods missing.
-const _JS_READY_CHECK := """
-!!(window.__vz_mic
-	&& typeof window.__vz_mic.arm === 'function'
-	&& typeof window.__vz_mic.request === 'function'
-	&& typeof window.__vz_mic.start === 'function'
-	&& typeof window.__vz_mic.stop === 'function')
-"""
+##
+## Returns 1/0 rather than a JS boolean, and on a single line, deliberately.
+## The predecessor of this check evaluated to a JS boolean and was read back as
+## `ok is bool and ok` - which was false on the deployed build even though the
+## object had installed perfectly, so _bridge_ready never became true and the
+## microphone was dead on every device. A number survives the crossing
+## unambiguously; see _bridge_installed(), which no longer trusts one type.
+const _JS_READY_CHECK := "(window.__vz_mic && typeof window.__vz_mic.arm === 'function' && typeof window.__vz_mic.request === 'function' && typeof window.__vz_mic.start === 'function' && typeof window.__vz_mic.stop === 'function') ? 1 : 0"
 
 
 func _ready() -> void:
@@ -297,8 +298,25 @@ func _ensure_bridge() -> bool:
 
 
 func _bridge_installed() -> bool:
-	var ok = JavaScriptBridge.eval(_JS_READY_CHECK, true)
-	return ok is bool and ok
+	return _js_truthy(JavaScriptBridge.eval(_JS_READY_CHECK, true))
+
+
+## Accepts whatever shape the bridge hands a yes/no back in. Insisting on one
+## type is what broke this: every check in this file used `x is bool and x`, so
+## a value that crossed as a float, an int or a string was read as "no" - which
+## declared a working microphone dead, made every start_recording() look like a
+## failure, and kept ?debug=1 from ever switching the diagnostic on. Only null,
+## the bridge genuinely returning nothing, counts as no.
+func _js_truthy(value) -> bool:
+	if value == null:
+		return false
+	if value is bool:
+		return value
+	if value is int or value is float:
+		return int(value) != 0
+	if value is String:
+		return value == "1" or value.to_lower() == "true"
+	return false
 
 
 func is_available() -> bool:
@@ -333,8 +351,9 @@ func request_permission() -> void:
 func start_recording() -> bool:
 	if not _ensure_bridge() or _recording or not is_available():
 		return false
-	var ok = JavaScriptBridge.eval("window.__vz_mic.start()", true)
-	if not (ok is bool and ok):
+	# 1/0 rather than a bare boolean, for the reason in _js_truthy().
+	var ok = JavaScriptBridge.eval("window.__vz_mic.start() ? 1 : 0", true)
+	if not _js_truthy(ok):
 		push_warning("WebAudioRecorder: start failed - %s" % last_error())
 		return false
 	_recording = true
@@ -391,12 +410,14 @@ func debug_state() -> String:
 	if not _is_debug_requested():
 		return ""
 	var js_perm = JavaScriptBridge.eval("window.__vz_mic ? window.__vz_mic.permission : -1", true)
-	var armed = JavaScriptBridge.eval("!!(window.__vz_mic && window.__vz_mic.wantPermission)", true)
+	var armed = JavaScriptBridge.eval(
+		"(window.__vz_mic && window.__vz_mic.wantPermission) ? 1 : 0", true
+	)
 	var err := last_error()
 	return "diag: bridge=%s js=%s armed=%s cached=%d\n%s" % [
 		"1" if _bridge_ready else "0",
 		str(js_perm),
-		"1" if (armed is bool and armed) else "0",
+		"1" if _js_truthy(armed) else "0",
 		_permission,
 		err if err != "" else "(kein Fehler gemeldet)",
 	]
@@ -409,9 +430,10 @@ func _is_debug_requested() -> bool:
 	if not OS.has_feature("web"):
 		return false
 	var flag = JavaScriptBridge.eval(
-		"((window.location.search || '') + (window.location.hash || '')).indexOf('debug=1') >= 0", true
+		"((window.location.search || '') + (window.location.hash || '')).indexOf('debug=1') >= 0 ? 1 : 0",
+		true
 	)
-	_debug_on = flag is bool and flag
+	_debug_on = _js_truthy(flag)
 	return _debug_on
 
 

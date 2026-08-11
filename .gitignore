@@ -12,6 +12,9 @@ export/
 __pycache__/
 *.py[cod]
 
+# Screenshots from tools/web_smoke.js
+tools/.web_smoke/
+
 # Runtime save data. The game writes to user:// (AppData), but guard against
 # copies dropped into the project root during debugging.
 save.json

@@ -53,7 +53,12 @@ func build() -> void:
 	_hint_label = Label.new()
 	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# The failure messages and the ?debug=1 line are long enough to run off a
-	# phone screen unwrapped.
+	# phone screen unwrapped. The explicit width floor is not optional: an
+	# autowrapping Label reports a minimum width of ~1px, and main.gd sizes this
+	# dialog with PRESET_MODE_MINSIZE, which would then wrap the text one word
+	# per line and bake the resulting several-thousand-pixel height into the
+	# panel - a dialog taller than the screen, showing nothing but background.
+	_hint_label.custom_minimum_size = Vector2(520, 0)
 	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_hint_label)
 
