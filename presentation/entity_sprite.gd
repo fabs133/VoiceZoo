@@ -30,26 +30,27 @@ var _reaction_tween: Tween
 @onready var sprite: Sprite2D = $Sprite2D
 ## Interaction and reaction sounds. Kept separate from the beat voice below so
 ## a keeper feeding an animal cannot silence its part in the song.
-@onready var audio: AudioStreamPlayer2D = $AudioStreamPlayer2D
+##
+## NOT positional. The whole zoo fits on one screen, so there is no meaningful
+## distance to model - and AudioStreamPlayer2D does not attenuate past
+## max_distance, it MUTES, which is how animals ended up silent rather than
+## quiet twice (see rhythm_tutorial_plan.md). A non-positional player cannot
+## have that bug at all.
+@onready var audio: AudioStreamPlayer = $AudioStreamPlayer
 @onready var label: Label = $Label
 
 ## The animal's own voice, played on the beat. Built in code rather than in the
 ## scene so the two players cannot be confused for one another.
-var _beat_audio: AudioStreamPlayer2D
+var _beat_audio: AudioStreamPlayer
 
 
 func _ready() -> void:
-	_beat_audio = AudioStreamPlayer2D.new()
+	_beat_audio = AudioStreamPlayer.new()
 	_beat_audio.name = "BeatAudio"
-	# The singing voice is the point of the game, so it runs at unity rather
-	# than the -3 dB it used to sit at. Loudness is managed once, on the master
-	# bus (main.gd), instead of by trimming each source.
+	# The singing voice is the point of the game, so it runs at unity. Loudness
+	# is managed once, on the master bus (main.gd), instead of by trimming each
+	# source - and there is no falloff left to inherit by accident.
 	_beat_audio.volume_db = 0.0
-	# Match the interaction player's spatial falloff, which is tuned in the
-	# scene file. Godot's defaults (2000 / 1.0) would make the singing voice
-	# audible across the whole map - one source of truth, no magic numbers.
-	_beat_audio.max_distance = audio.max_distance
-	_beat_audio.attenuation = audio.attenuation
 	add_child(_beat_audio)
 
 

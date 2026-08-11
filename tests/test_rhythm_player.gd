@@ -27,40 +27,34 @@ func before_each() -> void:
 	_player.setup(_entity_sprites)
 
 
-## The zoo has to sound like one piece of music from anywhere on the map.
-## AudioStreamPlayer2D does not fade past max_distance - it MUTES. With that set
-## to 800 on a 1536x1920 map, an animal measured 1013 units from the listener
-## played at -100 dB, so most of the zoo was silent rather than quiet, and a
-## guest's recording appeared not to work at all.
+## The zoo fits on one screen, so there is no distance worth modelling - and
+## positional audio has already cost this project two silent-animal bugs, because
+## AudioStreamPlayer2D does not fade past max_distance, it MUTES. An animal
+## measured 1013 units from the listener played at -100 dB while its recording
+## resolved perfectly, so a guest's own sound looked like it was being ignored.
 ##
-## Both files are read as TEXT rather than preloaded: entity_sprite.gd and
-## zoo_map.gd reference the Config autoload, which does not exist under
-## `godot --script`, so loading either here would only produce a compile error.
-func test_the_singing_voice_carries_across_the_whole_map() -> void:
-	var scene := _read_file("res://scenes/entity_sprite.tscn")
-	var max_distance := _property(scene, "max_distance")
-	var attenuation := _property(scene, "attenuation")
-	assert_gt(max_distance, 0.0, "entity_sprite.tscn declares max_distance")
-	assert_gt(attenuation, 0.0, "entity_sprite.tscn declares attenuation")
+## The guarantee is therefore stronger than "tuned correctly": no zoo voice is
+## positional at all, which is a property no future tuning can quietly undo.
+##
+## The scene is read as TEXT rather than preloaded: entity_sprite.gd references
+## the Config autoload, which does not exist under `godot --script`, so loading
+## it here would only produce a compile error.
+func test_animal_voices_are_not_distance_attenuated() -> void:
+	var scene := _code_only(_read_file("res://scenes/entity_sprite.tscn"), ";")
+	assert_true(scene.length() > 0, "entity_sprite.tscn is readable")
+	assert_false(scene.contains("AudioStreamPlayer2D"),
+		"the animal's players must be non-positional - AudioStreamPlayer2D mutes past max_distance")
+	assert_eq(_property(scene, "max_distance"), 0.0,
+		"a max_distance setting means positional audio crept back in")
 
-	var map := _read_file("res://presentation/zoo_map.gd")
-	var tile := _constant(map, "TILE_SIZE")
-	var map_size := Vector2(
-		_constant(map, "MAP_WIDTH") * tile,
-		_constant(map, "MAP_HEIGHT") * tile
-	)
-	assert_gt(map_size.length(), 0.0, "zoo_map.gd declares its dimensions")
-	# Worst case: listener and animal at opposite corners of the map.
-	var worst := map_size.length()
-	assert_gt(max_distance, worst,
-		"max_distance (%.0f) must exceed the map diagonal (%.0f) or far animals are muted outright"
-			% [max_distance, worst])
-
-	# And the roll-off inside that range has to stay gentle enough to hear.
-	var mult: float = pow(maxf(1.0 - worst / max_distance, 0.0), attenuation)
-	assert_gt(mult, 0.5,
-		"the far corner plays at %.2fx (%.1f dB) - too quiet to read as part of the loop"
-			% [mult, linear_to_db(maxf(mult, 0.00001))])
+	# The beat voice is built in code, so the scene alone cannot vouch for it.
+	# This is exactly how it went wrong before: it silently inherited Godot's
+	# falloff defaults because nothing asserted otherwise.
+	var sprite_src := _code_only(_read_file("res://presentation/entity_sprite.gd"), "#")
+	assert_false(sprite_src.contains("AudioStreamPlayer2D"),
+		"the beat voice must be built as a plain AudioStreamPlayer")
+	assert_false(sprite_src.contains("attenuation"),
+		"no falloff tuning should remain in entity_sprite.gd")
 
 
 func _read_file(path: String) -> String:
@@ -68,15 +62,21 @@ func _read_file(path: String) -> String:
 	return f.get_as_text() if f != null else ""
 
 
-## Value of a `name = number` line in a .tscn. Anchored to the start of a line
-## so prose in a comment ("max_distance was 800") cannot be read as the setting.
+## Strips `marker`-to-end-of-line comments, so the assertions above test what the
+## file DOES rather than what it says about itself - a comment explaining why
+## AudioStreamPlayer2D was abandoned must not read as it still being used.
+func _code_only(text: String, marker: String) -> String:
+	var out := ""
+	for line in text.split("\n"):
+		var cut: int = line.find(marker)
+		out += (line if cut < 0 else line.substr(0, cut)) + "\n"
+	return out
+
+
+## Value of a `name = number` line in a .tscn, or 0.0 when absent. Anchored to
+## the start of a line so prose in a comment cannot be read as a setting.
 func _property(text: String, name: String) -> float:
 	return _first_number(text, "(?m)^\\s*%s\\s*=\\s*([0-9]+(?:\\.[0-9]+)?)" % name)
-
-
-## Value of a `const NAME := number` line in a .gd file.
-func _constant(text: String, name: String) -> float:
-	return _first_number(text, "(?m)^\\s*const\\s+%s\\s*:=\\s*([0-9]+(?:\\.[0-9]+)?)" % name)
 
 
 func _first_number(text: String, pattern: String) -> float:
