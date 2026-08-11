@@ -60,3 +60,12 @@ func is_permission_denied() -> bool:
 ## rest of the session reads as the game spying on you.
 func release() -> void:
 	pass
+
+
+## A short line of platform state for on-screen display when recording is
+## unavailable, or "" to show nothing. Implementations decide when it is
+## warranted - the web one gates it behind ?debug=1 so guests never see it.
+## Exists because a phone has no reachable console: without this, an
+## unavailable microphone is indistinguishable from a broken one.
+func debug_state() -> String:
+	return ""

@@ -52,6 +52,9 @@ func build() -> void:
 
 	_hint_label = Label.new()
 	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# The failure messages and the ?debug=1 line are long enough to run off a
+	# phone screen unwrapped.
+	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_hint_label)
 
 	# Microphone picker - with several inputs connected, the OS default is
@@ -137,6 +140,7 @@ func _refresh_availability() -> void:
 	_awaiting_permission = false
 	_record_button.disabled = true
 	if _recorder == null:
+		# No recorder at all - a platform wiring failure, not a device verdict.
 		_hint_label.text = "Kein Mikrofon verfügbar"
 		return
 	if _recorder.is_available():
@@ -145,15 +149,34 @@ func _refresh_availability() -> void:
 		return
 	if _recorder.is_permission_pending():
 		_awaiting_permission = true
-		_hint_label.text = "Warte auf Mikrofon-Freigabe..."
+		# On web the prompt cannot open until the browser sees a real tap, and
+		# the tap that opened this dialog was consumed before the request was
+		# armed. So ask for one more - otherwise this sits here forever.
+		_hint_label.text = "Warte auf Mikrofon-Freigabe...\nTippe einmal auf den Bildschirm."
+		_append_diagnostic()
 		return
 	if _recorder.is_permission_denied():
 		# The only one of the failure states the guest can undo - and on iOS
 		# the refusal is sticky, so nothing here will ever prompt again. Say
 		# where to fix it instead of pretending there is no microphone.
 		_hint_label.text = "Mikrofon-Zugriff abgelehnt.\nIm Browser erlauben und die Seite neu laden."
+		_append_diagnostic()
 		return
-	_hint_label.text = "Kein Mikrofon verfügbar"
+	# Distinct from the null-recorder wording above on purpose. Both used to read
+	# "Kein Mikrofon verfügbar", so a device reporting it told us nothing about
+	# which of the two had happened.
+	_hint_label.text = "Kein Mikrofon gefunden oder der Browser blockiert die Aufnahme."
+	_append_diagnostic()
+
+
+## Appends platform state when the recorder offers any. Empty on native and on
+## web without ?debug=1, so guests never see it.
+func _append_diagnostic() -> void:
+	if _recorder == null:
+		return
+	var diag: String = _recorder.debug_state()
+	if diag != "":
+		_hint_label.text += "\n" + diag
 
 
 func _on_record_down() -> void:

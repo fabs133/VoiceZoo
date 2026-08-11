@@ -98,6 +98,29 @@ func test_no_microphone_is_not_reported_as_a_refusal() -> void:
 	assert_false(_dialog._hint_label.text.contains("abgelehnt"), "and not blamed on the guest")
 
 
+func test_no_device_and_no_recorder_do_not_share_one_message() -> void:
+	# These two printed the same string, so a phone reporting it could not tell
+	# us whether the platform had failed to build a recorder at all or the
+	# browser had refused to produce a microphone. That ambiguity cost a whole
+	# debugging round on a device with no reachable console.
+	_dialog.open(null, _bank, "Huhn 1")
+	var missing_recorder: String = _dialog._hint_label.text
+	_open_web()
+	_rec.report_no_device()
+	_dialog._process(0.016)
+	var no_device: String = _dialog._hint_label.text
+	assert_true(missing_recorder != no_device, "the two failures read differently")
+
+
+func test_diagnostic_line_is_absent_by_default() -> void:
+	# debug_state() is empty on every platform but web-with-?debug=1, so the
+	# guest-facing text stays clean.
+	_open_web()
+	_rec.report_no_device()
+	_dialog._process(0.016)
+	assert_false(_dialog._hint_label.text.contains("diag:"), "guests never see the diagnostic")
+
+
 func test_recovering_from_a_refusal_unlocks_the_button() -> void:
 	# The guest allowed it in browser settings and came back.
 	_open_web()

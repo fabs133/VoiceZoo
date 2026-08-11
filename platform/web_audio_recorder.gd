@@ -38,13 +38,25 @@ var _recording := false
 ## Permission is polled through the bridge, so it is cached: GRANTED and DENIED
 ## are terminal until release(), and the UI asks every frame while it waits.
 var _permission := _PERM_UNKNOWN
+## ?debug=1 in the URL. Resolved once - window.location cannot change under us
+## without a reload, which rebuilds this object anyway.
+var _debug_checked := false
+var _debug_on := false
 
 const _JS_BOOTSTRAP := """
+try {
 window.__vz_mic = window.__vz_mic || (function () {
 	var st = {
 		ctx: null, stream: null, source: null, proc: null, mute: null,
 		chunks: [], total: 0, sampleRate: 0,
-		recording: false, permission: 0, error: ''
+		recording: false, permission: 0, error: '',
+		// Set by arm(), consumed by the DOM listeners below. getUserMedia has to
+		// be called from inside a real user gesture, and GDScript never is one.
+		wantPermission: false,
+		// getUserMedia is in flight. Kept separate from `permission` so that
+		// arming can move the state to PENDING without the request() guard
+		// mistaking that for "already asked".
+		requesting: false
 	};
 
 	st.ensureContext = function () {
@@ -63,25 +75,51 @@ window.__vz_mic = window.__vz_mic || (function () {
 	// count as one, so the context is unlocked here from a DOM listener on the
 	// first touch. Left installed on purpose: a backgrounded tab suspends the
 	// context again and the next tap has to bring it back.
-	var unlock = function () { st.ensureContext(); };
+	//
+	// The same listeners carry the microphone request, for the same reason:
+	// getUserMedia needs user activation, and by the time Godot has turned a tap
+	// into a button press and called arm(), the gesture is long over. So arm()
+	// only raises a flag and the NEXT tap - captured here, inside genuine
+	// activation - is what actually opens the prompt.
+	var unlock = function () {
+		st.ensureContext();
+		if (st.wantPermission) {
+			st.wantPermission = false;
+			st.request();
+		}
+	};
 	window.addEventListener('touchend', unlock, true);
 	window.addEventListener('mousedown', unlock, true);
 	window.addEventListener('click', unlock, true);
 
+	// Called from GDScript. Deliberately does NOT prompt: see unlock() above.
+	st.arm = function () {
+		if (st.permission === 2) { return; }
+		st.wantPermission = true;
+		// PENDING from the game's point of view - it is waiting on the guest,
+		// whether that is a tap to trigger the prompt or the prompt itself.
+		st.permission = 1;
+	};
+
 	st.request = function () {
-		if (st.permission === 1 || st.permission === 2) { return; }
+		if (st.requesting || st.permission === 2) { return; }
 		if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
 			st.permission = 4;
 			st.error = 'getUserMedia unavailable - the page must be served over HTTPS';
 			return;
 		}
-		if (!st.ensureContext()) { st.permission = 4; return; }
+		// No ensureContext() here. getUserMedia needs no AudioContext, and tying
+		// the two together meant a context failure reported itself to the guest
+		// as "no microphone" while the microphone was fine. The context is built
+		// in start(), which is the only place that actually needs one.
+		st.requesting = true;
 		st.permission = 1;
 		navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+			st.requesting = false;
 			st.stream = stream;
-			st.sampleRate = st.ctx.sampleRate;
 			st.permission = 2;
 		}).catch(function (err) {
+			st.requesting = false;
 			// Only a refusal is worth telling the guest to go and undo.
 			// NotFoundError (no microphone) and the rest are not their doing.
 			var refused = (err.name === 'NotAllowedError' || err.name === 'SecurityError');
@@ -203,6 +241,8 @@ window.__vz_mic = window.__vz_mic || (function () {
 		st.chunks = [];
 		st.total = 0;
 		st.recording = false;
+		st.wantPermission = false;
+		st.requesting = false;
 		// Back to unknown, not denied: the next open() asks again, and a
 		// permission the guest already granted resolves without a second prompt.
 		st.permission = 0;
@@ -210,6 +250,24 @@ window.__vz_mic = window.__vz_mic || (function () {
 
 	return st;
 })();
+window.__vz_mic_boot_error = '';
+} catch (e) {
+	// A bootstrap that throws half way leaves window.__vz_mic present but
+	// incomplete, which is why the readiness check below tests for a FUNCTION
+	// rather than an object. Record why, so the on-screen diagnostic can say.
+	window.__vz_mic_boot_error = String((e && e.message) || e);
+}
+"""
+
+## The bootstrap is idempotent, so re-evaluating it is cheap and safe. Testing
+## for a callable rather than for 'object' is the point: a partially-thrown
+## bootstrap leaves the object there with the methods missing.
+const _JS_READY_CHECK := """
+!!(window.__vz_mic
+	&& typeof window.__vz_mic.arm === 'function'
+	&& typeof window.__vz_mic.request === 'function'
+	&& typeof window.__vz_mic.start === 'function'
+	&& typeof window.__vz_mic.stop === 'function')
 """
 
 
@@ -218,13 +276,29 @@ func _ready() -> void:
 	# elsewhere must degrade to "unavailable" rather than error.
 	if not OS.has_feature("web"):
 		return
+	_ensure_bridge()
+
+
+## Installs the bootstrap if it is not there, and re-checks every time. This used
+## to run once in _ready() and latch: if that single moment failed - the page
+## still settling, a transient throw - the microphone was dead for the whole
+## session with nothing on screen to say why. Called from each entry point
+## instead, so a later attempt can still recover.
+func _ensure_bridge() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	if _bridge_ready and _bridge_installed():
+		return true
 	JavaScriptBridge.eval(_JS_BOOTSTRAP, true)
-	# eval returns null for objects, so the bootstrap is confirmed with a
-	# primitive rather than assumed.
-	var ok = JavaScriptBridge.eval("typeof window.__vz_mic === 'object'", true)
-	_bridge_ready = ok is bool and ok
+	_bridge_ready = _bridge_installed()
 	if not _bridge_ready:
-		push_warning("WebAudioRecorder: JavaScript bridge unavailable")
+		push_warning("WebAudioRecorder: JavaScript bridge unavailable - %s" % last_error())
+	return _bridge_ready
+
+
+func _bridge_installed() -> bool:
+	var ok = JavaScriptBridge.eval(_JS_READY_CHECK, true)
+	return ok is bool and ok
 
 
 func is_available() -> bool:
@@ -243,16 +317,21 @@ func is_recording() -> bool:
 	return _recording
 
 
+## Arms the request; it does not prompt. The browser will only open the prompt
+## from inside a user gesture, and Godot's input is dispatched from
+## requestAnimationFrame, which is not one - so the DOM listeners in the
+## bootstrap fire the actual getUserMedia call on the next real tap. Stays
+## synchronous and non-blocking, as the contract requires.
 func request_permission() -> void:
-	if not _bridge_ready or _permission == _PERM_GRANTED:
+	if not _ensure_bridge() or _permission == _PERM_GRANTED:
 		return
-	JavaScriptBridge.eval("window.__vz_mic.request()", true)
+	JavaScriptBridge.eval("window.__vz_mic.arm()", true)
 	_permission = _PERM_PENDING
 	_poll_permission()
 
 
 func start_recording() -> bool:
-	if not _bridge_ready or _recording or not is_available():
+	if not _ensure_bridge() or _recording or not is_available():
 		return false
 	var ok = JavaScriptBridge.eval("window.__vz_mic.start()", true)
 	if not (ok is bool and ok):
@@ -263,7 +342,7 @@ func start_recording() -> bool:
 
 
 func stop_recording() -> PackedByteArray:
-	if not _bridge_ready or not _recording:
+	if not _ensure_bridge() or not _recording:
 		return PackedByteArray()
 	_recording = false
 	var b64 = JavaScriptBridge.eval(
@@ -287,12 +366,53 @@ func release() -> void:
 	JavaScriptBridge.eval("window.__vz_mic.release()", true)
 
 
-## Last message from the JS side, for push_warning and the diag tools.
+## Last message from the JS side, for push_warning and the on-screen diagnostic.
+## Never returns "" for a broken bridge: silence there was what made this
+## failure impossible to read from a phone.
 func last_error() -> String:
+	if not OS.has_feature("web"):
+		return "not a web build"
 	if not _bridge_ready:
-		return "bridge unavailable"
+		var boot = JavaScriptBridge.eval("window.__vz_mic_boot_error || ''", true)
+		if boot is String and boot != "":
+			return "bridge bootstrap threw: %s" % boot
+		return "bridge unavailable - window.__vz_mic did not install"
 	var msg = JavaScriptBridge.eval("window.__vz_mic.error || ''", true)
-	return str(msg) if msg is String else ""
+	if msg is String and msg != "":
+		return msg
+	return ""
+
+
+## One line of state for the on-screen diagnostic, empty unless the page was
+## opened with ?debug=1. Safari's console is unreachable without a Mac and this
+## only reproduces on the deployed build, so the screen is the only channel
+## left. OS.is_debug_build() would be false here - the export is a release.
+func debug_state() -> String:
+	if not _is_debug_requested():
+		return ""
+	var js_perm = JavaScriptBridge.eval("window.__vz_mic ? window.__vz_mic.permission : -1", true)
+	var armed = JavaScriptBridge.eval("!!(window.__vz_mic && window.__vz_mic.wantPermission)", true)
+	var err := last_error()
+	return "diag: bridge=%s js=%s armed=%s cached=%d\n%s" % [
+		"1" if _bridge_ready else "0",
+		str(js_perm),
+		"1" if (armed is bool and armed) else "0",
+		_permission,
+		err if err != "" else "(kein Fehler gemeldet)",
+	]
+
+
+func _is_debug_requested() -> bool:
+	if _debug_checked:
+		return _debug_on
+	_debug_checked = true
+	if not OS.has_feature("web"):
+		return false
+	var flag = JavaScriptBridge.eval(
+		"((window.location.search || '') + (window.location.hash || '')).indexOf('debug=1') >= 0", true
+	)
+	_debug_on = flag is bool and flag
+	return _debug_on
 
 
 ## Every state except UNKNOWN and PENDING is terminal until release(), so the
