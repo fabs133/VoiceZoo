@@ -21,6 +21,8 @@ var _locked_labels: Dictionary = {}  # type_id → Label
 const EntitySpriteScene = preload("res://scenes/entity_sprite.tscn")
 
 @onready var _close_button: Button = $VBoxContainer/HeaderRow/CloseButton
+## The one child of the list that _rebuild_shop must never remove.
+@onready var _header_row: HBoxContainer = $VBoxContainer/HeaderRow
 
 
 func _ready() -> void:
@@ -67,10 +69,22 @@ func _refresh() -> void:
 
 func _rebuild_shop() -> void:
 	var container = $VBoxContainer
-	# Clear all dynamic children (keep TitleLabel)
+	# Detach IMMEDIATELY, then free. queue_free() alone is deferred to the end of
+	# the frame, and the replacement rows are added in this same frame - so the
+	# old node is still attached when its replacement arrives, Godot resolves the
+	# name clash by renaming the NEW node, and the name it picks is "@Label@3".
+	# That does not begin with "Locked_", so the next rebuild's name check no
+	# longer recognised it and it was never removed. Every unlock after the first
+	# therefore left a stale, frozen copy of the locked list above the buy
+	# buttons - which is why the shop showed each animal twice with different
+	# numbers, and why the buy buttons appeared in the middle rather than on top.
+	#
+	# Identity, not names: everything except the header row is ours to remove.
 	for child in container.get_children():
-		if child is Button or child.name.begins_with("Locked_"):
-			child.queue_free()
+		if child == _header_row:
+			continue
+		container.remove_child(child)
+		child.queue_free()
 	_buttons.clear()
 	_locked_labels.clear()
 
