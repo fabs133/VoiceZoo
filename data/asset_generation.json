@@ -14,10 +14,32 @@
     { "id": "elephant", "enabled": true,  "subject": "young elephant, trunk raised slightly, big friendly ears" },
     { "id": "dog",      "enabled": true,  "subject": "small fluffy Maltese dog, white coat with dark patches, happy expression, tail up",
       "note": "confirm patch placement against a photo before curating" },
-    { "id": "cat",      "enabled": false, "subject": "COLORING-TBD shorthair cat sitting upright, tail curled around its paws",
-      "note": "BLOCKED: coloring unknown - ask the couple, then set enabled=true and fix the subject line" },
+    { "id": "cat",      "enabled": true,  "subject": "black shorthair cat with bright yellow eyes, sitting upright, tail curled around its paws, facing slightly left" },
     { "id": "chicken",  "enabled": false, "note": "anchor already approved - reuse the raw anchor PNG directly" },
     { "id": "lion",     "enabled": false, "note": "anchor already approved" },
     { "id": "parrot",   "enabled": false, "note": "anchor already approved" }
-  ]
+  ],
+
+  "tiles": {
+    "note": "Second job type, run with --tiles. Ground textures, not sprites: a different model, a different style block, and no candidate suffix - zoo_map.gd loads these by exact filename.",
+    "defaults": {
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "reference_image": "assets/sprites/animals/chicken.png",
+      "output_dir": "assets/generated/tiles"
+    },
+    "style_template": "A seamless repeating ground texture of {subject}, seen from directly above, flat top-down view. Cozy cartoon game art style, flat cel shading with at most two tones, no outline, no border, no vignette, no directional shadow, even flat lighting across the whole image. Warm cozy palette of cream, wood brown and leaf green. Subtle even detail with no large features and no strong direction, so the texture reads as a uniform fill. No subjects, no props, no animals, no text, no watermark. Fills the entire square edge to edge.",
+    "subjects": [
+      { "id": "grass",    "enabled": true, "subject": "short soft green grass" },
+      { "id": "grass2",   "enabled": true, "subject": "short green grass with a few tiny pale wildflowers scattered evenly" },
+      { "id": "path",     "enabled": true, "subject": "packed light dirt with fine gravel, an even scatter of small stones with no ruts, no tracks, no lanes and no direction of travel" },
+      { "id": "water",    "enabled": true, "subject": "calm shallow blue water with a fine even dimpled surface, ripples equally scattered in all directions with no waves, no current and no direction of flow" },
+      { "id": "sand",     "enabled": true, "subject": "fine pale beach sand" },
+      { "id": "snow",     "enabled": true, "subject": "clean pale snow with a faint even powder texture" },
+      { "id": "savanna",  "enabled": true, "subject": "dry golden savanna grass" },
+      { "id": "fence",    "enabled": false,
+        "subject": "dense rounded green hedge foliage, small tight leaf clusters, slightly darker than the grass",
+        "note": "DEFERRED on purpose. This is the zone BORDER tile and zoo_map.gd paints the same one for all four edges AND all four corners, so it must be perfectly isotropic. Judge it in context once the ground tiles are in; a directional fence would need a 6-8 piece set plus changes to _build_tileset and _paint_zoo_layout." }
+    ]
+  }
 }
