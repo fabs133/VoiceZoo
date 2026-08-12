@@ -61,16 +61,31 @@ func _create_zone_overlays() -> void:
 		add_child(overlay)
 		_zone_overlays[zone_name] = overlay
 
-		# Lock label centered on zone
+		# Lock label centered on zone.
+		#
+		# It was NOT centered: `anchors_preset` is an inspector-only property, so
+		# assigning it from code does nothing at all. The label kept its default
+		# top-left anchors and zero size, which parked the padlock in the zone's
+		# top-left CORNER, sitting on the fence - which is exactly where it was
+		# spotted on a phone. set_anchors_preset() is the call that applies one.
+		#
+		# FULL_RECT rather than CENTER: the label then spans the whole overlay and
+		# its own alignment does the centering, which holds for any zone size
+		# instead of depending on the label having been given a size first.
+		#
+		# ...and set_anchors_AND_OFFSETS_preset, not set_anchors_preset. The
+		# latter moves the anchors but leaves the offsets where they were, and a
+		# fresh Label's offsets are its own text size - so the rect ends up the
+		# wrong size and the padlock stays wedged in the corner. This is the call
+		# record_dialog and composition_view already use.
 		var lock_label = Label.new()
 		lock_label.text = "🔒"
 		lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lock_label.add_theme_font_size_override("font_size", 32)
-		lock_label.anchors_preset = Control.PRESET_CENTER
-		lock_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		lock_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+		lock_label.add_theme_font_size_override("font_size", 64)
+		lock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		overlay.add_child(lock_label)
+		lock_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	# Farm starts unlocked
 	unlock_zone("farm", false)
