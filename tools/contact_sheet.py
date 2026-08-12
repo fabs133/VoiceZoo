@@ -82,12 +82,16 @@ def missing_cell(text: str) -> Image.Image:
 def main() -> None:
     args = sys.argv[1:]
     out_path = args[args.index("--out") + 1] if "--out" in args else DEFAULT_OUT
-    sprites = (args[args.index("--sprites") + 1].split(",")
-               if "--sprites" in args else ["cat"])
+    sprites = ([] if "--no-sprites" in args else
+               args[args.index("--sprites") + 1].split(",") if "--sprites" in args
+               else ["cat"])
+    tile_dir = args[args.index("--tiles-dir") + 1] if "--tiles-dir" in args else TILE_DIR
+    order = (args[args.index("--order") + 1].split(",")
+             if "--order" in args else TILE_ORDER)
 
     cells = []
-    for name in TILE_ORDER:
-        path = os.path.join(TILE_DIR, name + ".png")
+    for name in order:
+        path = os.path.join(tile_dir, name + ".png")
         if os.path.isfile(path):
             src_px = Image.open(path).size[0]
             label = f"{name}  {src_px}px"

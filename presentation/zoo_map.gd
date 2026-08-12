@@ -7,13 +7,24 @@ const MAP_WIDTH := 24
 const MAP_HEIGHT := 30
 
 @onready var tile_map: TileMapLayer = $TileMapLayer
+## The fence draws on its OWN layer, above the ground. The fence art is a
+## decoration asset with real transparency between the posts, so painting it
+## into the ground layer would punch holes in the map wherever it is see-through.
+## Built in code rather than added to the scene so the two layers cannot drift
+## apart: they share one TileSet, and this one is created from it.
+var fence_map: TileMapLayer
 
 var _occupied_cells: Dictionary = {}  # Vector2i → entity_id
 var _zone_overlays: Dictionary = {}  # zone_name → ColorRect
 var _unlocked_zones: Dictionary = {}  # zone_name → bool
 
-# Tile source IDs (assigned during tileset creation)
-enum Tile { GRASS, GRASS2, PATH, WATER, FENCE, SAND, SNOW, SAVANNA }
+# Tile source IDs (assigned during tileset creation).
+# FENCE is the old single isotropic border tile, kept so the enum's existing
+# values do not shift; the border is painted from the four directional pieces.
+enum Tile {
+	GRASS, GRASS2, PATH, WATER, FENCE, SAND, SNOW, SAVANNA,
+	FENCE_TOP, FENCE_BOTTOM, FENCE_LEFT, FENCE_RIGHT,
+}
 
 # Zone definitions: name → Rect2i area on the grid
 var zones: Dictionary = {
@@ -141,6 +152,10 @@ func _build_tileset() -> void:
 		"res://assets/tiles/sand.png",
 		"res://assets/tiles/snow.png",
 		"res://assets/tiles/savanna.png",
+		"res://assets/tiles/fence_top.png",
+		"res://assets/tiles/fence_bottom.png",
+		"res://assets/tiles/fence_left.png",
+		"res://assets/tiles/fence_right.png",
 	]
 
 	for i in range(tile_files.size()):
@@ -151,6 +166,14 @@ func _build_tileset() -> void:
 		source.create_tile(Vector2i(0, 0))
 
 	tile_map.tile_set = ts
+
+	fence_map = TileMapLayer.new()
+	fence_map.name = "FenceLayer"
+	fence_map.tile_set = ts
+	# Directly after the ground layer, so it covers the ground but still sits
+	# below Entities - animals walk in front of the fence rather than behind it.
+	add_child(fence_map)
+	move_child(fence_map, tile_map.get_index() + 1)
 
 
 func _paint_zoo_layout() -> void:
@@ -190,19 +213,39 @@ func _paint_zoo_layout() -> void:
 			for x in range(rect.position.x, rect.position.x + rect.size.x):
 				_set_tile(x, y, base_tile)
 
-		# Fence border around zone
-		for x in range(rect.position.x, rect.position.x + rect.size.x):
-			_set_tile(x, rect.position.y, Tile.FENCE)
-			_set_tile(x, rect.position.y + rect.size.y - 1, Tile.FENCE)
-		for y in range(rect.position.y, rect.position.y + rect.size.y):
-			_set_tile(rect.position.x, y, Tile.FENCE)
-			_set_tile(rect.position.x + rect.size.x - 1, y, Tile.FENCE)
+		# Fence border, on the layer above. The corners are deliberately NOT
+		# separate pieces: the horizontal runs already end in a post, so letting
+		# the top and bottom rows own the full width gives an unbroken rail
+		# corner to corner. Adding dedicated corner pieces on top of that drew a
+		# second stub of rail into the corner.
+		var left := rect.position.x
+		var right := rect.position.x + rect.size.x - 1
+		var top := rect.position.y
+		var bottom := rect.position.y + rect.size.y - 1
+		for x in range(left, right + 1):
+			_set_fence(x, top, Tile.FENCE_TOP)
+			_set_fence(x, bottom, Tile.FENCE_BOTTOM)
+		for y in range(top + 1, bottom):
+			_set_fence(left, y, Tile.FENCE_LEFT)
+			_set_fence(right, y, Tile.FENCE_RIGHT)
 
-		# Gate opening (2 tiles wide, bottom center of fence)
+		# Gate opening (2 tiles wide, bottom center). The fence is a separate
+		# layer now, so the gate is an ERASE rather than a ground repaint - the
+		# zone's own ground stays visible through the gap.
 		var gate_x = rect.position.x + rect.size.x / 2
-		_set_tile(gate_x, rect.position.y + rect.size.y - 1, Tile.PATH)
-		_set_tile(gate_x - 1, rect.position.y + rect.size.y - 1, Tile.PATH)
+		_clear_fence(gate_x, bottom)
+		_clear_fence(gate_x - 1, bottom)
+		_set_tile(gate_x, bottom, Tile.PATH)
+		_set_tile(gate_x - 1, bottom, Tile.PATH)
 
 
 func _set_tile(x: int, y: int, tile_id: int) -> void:
 	tile_map.set_cell(Vector2i(x, y), tile_id, Vector2i(0, 0))
+
+
+func _set_fence(x: int, y: int, tile_id: int) -> void:
+	fence_map.set_cell(Vector2i(x, y), tile_id, Vector2i(0, 0))
+
+
+func _clear_fence(x: int, y: int) -> void:
+	fence_map.erase_cell(Vector2i(x, y))
