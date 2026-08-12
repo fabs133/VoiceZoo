@@ -530,13 +530,35 @@ func test_playhead_aligns_with_the_cell_columns() -> void:
 # --- Link-through and live updates ---
 
 func test_open_marks_the_animal_it_was_opened_for() -> void:
+	# Marked by COLOUR, not by a glyph. The old "▸" prefix used a character no
+	# shipped font can draw, so it reached a phone as a tofu box - and a single
+	# small character is the wrong marker for a list that grows.
 	_add("chicken")
 	var target = _add("dog")
 	_view.open(target.id)
 	var index: int = _view.row_index_of(target.id)
 	assert_gt(float(index), -1.0, "the animal has a row")
 	var label: Label = _view._rows[index]["name_label"]
-	assert_true(label.text.begins_with("▸"), "and it is marked so the scroll target is obvious")
+	assert_true(label.has_theme_color_override("font_color"), "the focused row is recoloured")
+	assert_eq(label.get_theme_color("font_color"), ViewScript.FOCUS_COLOR, "in the accent colour")
+	assert_false(label.text.contains("▸"), "and carries no undrawable marker character")
+	for i in _view._rows.size():
+		if i == index:
+			continue
+		assert_false(_view._rows[i]["name_label"].has_theme_color_override("font_color"),
+			"every other row keeps the theme colour")
+
+
+func test_the_focus_highlight_is_cleared_when_it_moves() -> void:
+	# Reopening on a different animal must not leave two rows looking chosen.
+	var first = _add("chicken")
+	var second = _add("dog")
+	_view.open(first.id)
+	_view.open(second.id)
+	var stale: Label = _view._rows[_view.row_index_of(first.id)]["name_label"]
+	assert_false(stale.has_theme_color_override("font_color"), "the old row is released")
+	var current: Label = _view._rows[_view.row_index_of(second.id)]["name_label"]
+	assert_true(current.has_theme_color_override("font_color"), "and the new one is marked")
 
 
 func test_row_index_of_unknown_animal_is_minus_one() -> void:

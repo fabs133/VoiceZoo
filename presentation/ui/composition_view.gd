@@ -52,6 +52,14 @@ const CELL_OFF := Color("#D8CFC0")
 const CELL_CAPPED := Color("#E9718F", 0.35)
 const PLAYHEAD_COLOR := Color("#F2B138", 0.28)
 const PARKED_ROW_ALPHA := 0.45
+## The row the Studio was opened for, marked by COLOUR rather than a glyph.
+## It used to carry a "▸" prefix, which no shipped font can draw - it rendered
+## as a tofu box on the deployed build. A small marker is also the wrong tool
+## for the job: the longer the list, the harder a single character is to find,
+## whereas a coloured name is picked out at a glance at any length.
+const FOCUS_COLOR := Color("#E9718F")
+const FOCUS_OUTLINE := Color("#3A2E28")
+const FOCUS_OUTLINE_SIZE := 6
 
 var _zoo_state
 var _rhythm_player
@@ -485,9 +493,8 @@ func _refresh_row_label(row: Dictionary, fully_capped: bool, name: String) -> vo
 		text += "  (pausiert)"
 	elif fully_capped:
 		text += "  (übertönt)"
-	if entity.id == _focus_entity_id:
-		text = "▸ " + text
 	label.text = text
+	_apply_focus_style(label, entity.id == _focus_entity_id)
 	# The mute button states what it will do next, not what is true now: a
 	# control labelled with its own current state reads as a status light.
 	# Words, not symbols - the theme font has no glyph for the obvious ones
@@ -497,6 +504,20 @@ func _refresh_row_label(row: Dictionary, fully_capped: bool, name: String) -> vo
 	mute.tooltip_text = "Wieder mitsingen lassen" if not entity.in_song else "Stummschalten"
 	var root: Control = row["root"]
 	root.modulate.a = PARKED_ROW_ALPHA if not entity.in_song else 1.0
+
+
+## Paints (or clears) the "this is the row you came here for" highlight. The
+## overrides are REMOVED rather than set back to a default colour, so the row
+## returns to whatever the theme says instead of to a hardcoded guess at it.
+func _apply_focus_style(label: Label, focused: bool) -> void:
+	if focused:
+		label.add_theme_color_override("font_color", FOCUS_COLOR)
+		label.add_theme_color_override("font_outline_color", FOCUS_OUTLINE)
+		label.add_theme_constant_override("outline_size", FOCUS_OUTLINE_SIZE)
+	else:
+		label.remove_theme_color_override("font_color")
+		label.remove_theme_color_override("font_outline_color")
+		label.remove_theme_constant_override("outline_size")
 
 
 func _refresh_legend() -> void:
