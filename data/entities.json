@@ -27,7 +27,7 @@
     "base_cost": 200.0,
     "cost_exponent": 1.15,
     "sound_interval": 10.0,
-    "sprite": "res://assets/placeholder_sprites/cow.png",
+    "sprite": "res://assets/sprites/animals/cat.png",
     "sprite_size": 88,
     "default_sound": "res://assets/placeholder_sounds/cow.wav",
     "zone": "farm"
