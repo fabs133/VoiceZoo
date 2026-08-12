@@ -1,6 +1,16 @@
 extends Camera2D
 ## Touch-friendly camera: drag to pan, pinch to zoom, clamped to map bounds.
 
+## Godot delivers each pointer TWICE: a finger produces a real InputEventScreen*
+## plus an emulated mouse event, and on desktop (emulate_touch_from_mouse is on)
+## a mouse produces the mirror image. Both arrive here, so handling both applied
+## every pan twice - the map moved at double speed and fought itself, which is
+## why dragging felt unreliable while pinch, which only ever had one code path,
+## was fine. Emulated events carry device -1; the real one is kept, whichever it
+## is on the device in hand. Emulation stays ENABLED because Godot's Controls
+## need mouse events to respond to touch at all.
+const EMULATED_DEVICE := -1
+
 @export var drag_sensitivity: float = 1.0
 @export var zoom_speed: float = 0.1
 @export var zoom_min: Vector2 = Vector2(0.5, 0.5)
@@ -31,12 +41,20 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.device == EMULATED_DEVICE:
+		return
+
 	# Touch drag
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_touch_points[event.index] = event.position
 		else:
 			_touch_points.erase(event.index)
+		# Without this the distance from the LAST pinch survives, and the next
+		# two-finger gesture opens with a jump proportional to how far apart the
+		# fingers were the previous time.
+		if _touch_points.size() < 2:
+			_last_pinch_distance = 0.0
 
 	elif event is InputEventScreenDrag:
 		_touch_points[event.index] = event.position

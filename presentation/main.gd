@@ -22,6 +22,7 @@ const SoundResolverScript = preload("res://presentation/sound_resolver.gd")
 const RecordDialogScript = preload("res://presentation/ui/record_dialog.gd")
 const RhythmPlayerScript = preload("res://presentation/rhythm_player.gd")
 const CompositionViewScript = preload("res://presentation/ui/composition_view.gd")
+const StudioHintScript = preload("res://presentation/ui/studio_hint.gd")
 
 var interaction_player  # RefCounted playback orchestrator (see interaction_player.gd)
 var rhythm_player  # fires entity sprites on the beat (see rhythm_player.gd)
@@ -30,6 +31,7 @@ var sound_resolver  # entity sound lookup (user recording beats placeholder)
 var audio_recorder: AudioRecorderBase  # platform-selected in _ready
 var record_dialog  # code-built PanelContainer
 var composition_view  # code-built full-screen Studio grid
+var studio_hint  # code-built one-shot nudge toward the Studio
 var _recording_entity: EntityData  # entity the open record dialog belongs to
 
 
@@ -64,6 +66,15 @@ func _ready() -> void:
 	shop_panel.setup(zoo_state, zoo_map)
 	shop_panel.entity_purchased.connect(_on_entity_purchased)
 	shop_panel.entity_tapped.connect(_on_entity_tapped)
+	# The shop is a bottom sheet that covers the lower third of the zoo, so it
+	# opens and closes. The state rides in the save: a guest who closed it should
+	# not have it back in their face after a reload.
+	shop_panel.closed.connect(_on_shop_closed)
+	hud.shop_requested.connect(_on_shop_requested)
+	if zoo_state.shop_open:
+		shop_panel.open()
+	else:
+		shop_panel.visible = false
 	entity_info.upgrade_purchased.connect(_on_entity_upgraded)
 	entity_info.assign_keeper_requested.connect(_on_assign_keeper_requested)
 	keeper_assign_panel.keeper_assigned.connect(_on_keeper_assigned)
@@ -96,6 +107,12 @@ func _ready() -> void:
 	composition_view.record_requested.connect(_on_record_sound_requested)
 	# ...which means the dialog has to sit ABOVE the full-screen Studio. It was
 	# added to this layer first, so without this it would open behind it.
+	# The one-time nudge toward the Studio. Added to the same layer so it can sit
+	# over the HUD, and it never blocks input (see studio_hint.gd).
+	studio_hint = StudioHintScript.new()
+	entity_info.get_parent().add_child(studio_hint)
+	studio_hint.dismissed.connect(_on_studio_hint_dismissed)
+
 	var ui_layer: Node = record_dialog.get_parent()
 	ui_layer.move_child(record_dialog, ui_layer.get_child_count() - 1)
 	# Persist a composing session when the Studio closes. Per-tap saving would
@@ -231,11 +248,33 @@ func _on_entity_purchased(_type_id: String, entity: EntityData, sprite_node: Nod
 	_entity_sprites[entity.id] = sprite_node
 	# A new animal needs a part in the song, rotated off the ones already owned.
 	zoo_state.apply_rhythm_defaults(Config.get_rhythm_config())
+	# Three first-time testers all found the idle loop and only one found the
+	# composer, so the FIRST animal earns one nudge toward it. Armed here rather
+	# than at launch: before there is an animal the Studio is empty and "deine
+	# Tiere bekommen deine Stimme" promises nothing.
+	if not zoo_state.studio_hint_seen and zoo_state.entities.size() == 1:
+		studio_hint.start(hud.studio_button)
 
 
 func _on_entity_sprite_tapped(sprite: Node2D) -> void:
 	# Adapter: the sprite signal carries the sprite; the info panel wants EntityData.
 	_on_entity_tapped(sprite.entity_data)
+
+
+func _on_shop_requested() -> void:
+	# Toggle: the same button that opens it closes it again, so a guest who
+	# opened it by accident is not stuck hunting for the way out.
+	if shop_panel.is_open():
+		shop_panel.close()
+		return
+	shop_panel.open()
+	zoo_state.shop_open = true
+	_save_game()
+
+
+func _on_shop_closed() -> void:
+	zoo_state.shop_open = false
+	_save_game()
 
 
 func _on_record_sound_requested(entity: EntityData) -> void:
@@ -268,7 +307,16 @@ func _on_entity_tapped(entity: EntityData) -> void:
 
 
 func _on_studio_requested() -> void:
+	# Opening the Studio answers the hint, so it stops nudging.
+	if studio_hint != null and studio_hint.is_showing():
+		studio_hint.dismiss()
 	composition_view.open()
+
+
+## Shown once per save, whether it was tapped, answered or simply timed out.
+func _on_studio_hint_dismissed() -> void:
+	zoo_state.studio_hint_seen = true
+	_save_game()
 
 
 ## Link-through from the info panel: same screen, scrolled to that animal.

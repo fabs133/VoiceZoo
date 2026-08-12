@@ -17,12 +17,23 @@ const LABEL_GAP := 6.0
 const LABEL_HEIGHT := 20.0
 ## A tap target is never smaller than this, however small the animal is drawn.
 const MIN_TAP_RADIUS := 40.0
+## How far a pointer may travel between press and release and still count as a
+## tap. Beyond this it was a pan, and opening an info panel over the map the
+## player was trying to scroll is the single most annoying thing this screen can
+## do. Screen pixels, deliberately generous: a finger on glass is never still.
+const TAP_SLOP := 40.0
+## Emulated twin of a real pointer event - see ZooCamera.EMULATED_DEVICE. Without
+## this the same tap arrives twice and fires the signal twice.
+const EMULATED_DEVICE := -1
 
 var entity_data: EntityData
 var sound_resolver = null  # injected by main; user recordings win over placeholders
 var _home_position: Vector2
 var _wander_radius: float = 20.0
 var _tap_radius: float = 40.0
+## Where the current press started, and whether it began on this animal.
+var _press_position: Vector2 = Vector2.ZERO
+var _press_hit: bool = false
 var _is_reacting: bool = false
 var _wander_tween: Tween
 var _reaction_tween: Tween
@@ -132,19 +143,31 @@ func _wander_to_random_point() -> void:
 	_wander_tween.tween_callback(_wander_to_random_point)
 
 
+## Taps fire on RELEASE, not on press. Firing on press meant that starting a
+## drag anywhere near an animal opened its info panel and swallowed the pan,
+## which is most of why scrolling the map felt broken on a phone.
 func _unhandled_input(event: InputEvent) -> void:
-	if entity_data == null:
+	if entity_data == null or event.device == EMULATED_DEVICE:
 		return
-	if event is InputEventScreenTouch and event.pressed:
-		_check_tap(event.position)
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_check_tap(event.position)
+
+	if event is InputEventScreenTouch or (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		if event.pressed:
+			_press_position = event.position
+			_press_hit = _is_over_entity(event.position)
+		elif _press_hit:
+			_press_hit = false
+			if event.position.distance_to(_press_position) <= TAP_SLOP and _is_over_entity(event.position):
+				tapped.emit(self)
+	elif event is InputEventScreenDrag or event is InputEventMouseMotion:
+		# Once the pointer has travelled far enough it is a pan; give up the tap
+		# now rather than deciding at release, so the camera has it uncontested.
+		if _press_hit and event.position.distance_to(_press_position) > TAP_SLOP:
+			_press_hit = false
 
 
-func _check_tap(screen_pos: Vector2) -> void:
+func _is_over_entity(screen_pos: Vector2) -> bool:
 	var world_pos = get_canvas_transform().affine_inverse() * screen_pos
-	if world_pos.distance_to(position) <= _tap_radius:
-		tapped.emit(self)
+	return world_pos.distance_to(position) <= _tap_radius
 
 
 func refresh_sound() -> void:

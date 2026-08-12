@@ -29,6 +29,13 @@ var interaction_engine = _InteractionEngine.new()
 ## ride along in the save; presentation only drives it and renders the result.
 var rhythm = _RhythmEngine.new()
 
+## Persisted UI state. Core never acts on these; they live here because the save
+## file is the only thing that survives a reload, and presentation reads them by
+## name on load. Both default to false on purpose: a new guest should meet the
+## zoo rather than the shop, and should be offered the Studio hint exactly once.
+var shop_open: bool = false
+var studio_hint_seen: bool = false
+
 var _next_id: int = 0
 var _next_keeper_id: int = 0
 
@@ -189,6 +196,8 @@ func to_dict(now: float = 0.0) -> Dictionary:
 		"sound_bank": sound_bank.to_dict(),
 		"interactions": interaction_engine.to_dict(),
 		"rhythm": rhythm.to_dict(),
+		"shop_open": shop_open,
+		"studio_hint_seen": studio_hint_seen,
 	}
 
 
@@ -211,4 +220,9 @@ func from_dict(d: Dictionary) -> void:
 	sound_bank.from_dict(d.get("sound_bank", {}))
 	interaction_engine.from_dict(d.get("interactions", {}))
 	rhythm.from_dict(d.get("rhythm", {}))
+	# Both default false, which is also what a save written before these existed
+	# yields: a returning player gets the zoo, not the shop, and the Studio hint
+	# is offered once to anyone who has not already seen it.
+	shop_open = bool(d.get("shop_open", false))
+	studio_hint_seen = bool(d.get("studio_hint_seen", false))
 

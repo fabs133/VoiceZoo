@@ -24,18 +24,25 @@ signal closed()
 
 const _RhythmEngine = preload("res://core/rhythm_engine.gd")
 
-## Section 3b's space budget. 1080 wide, minus 300 for the row label and the
-## margins, leaves ~93px per cell at 8 steps - above the 88px touch minimum.
-## At 16 steps it would be ~47px, which is exactly why V1 is one 8-step bar.
-const ROW_LABEL_WIDTH := 300.0
-const MIN_TOUCH_SIZE := 88.0
+## Space budget. Each animal occupies TWO lines rather than one:
+##
+##   [thumb] name...................... [mic] [mute]     <- header line
+##   [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ][ 6 ][ 7 ][ 8 ]            <- full-width cells
+##
+## The single-line layout could not be made tappable: 8 cells at the 120px touch
+## minimum is 960px, and the row label needed 300 of the same 1080. Giving the
+## cells the whole width buys ~127px each; the cost is taller rows, which scroll.
+## At 16 steps it would still be ~62px, so V1 remains one 8-step bar.
+const MIN_TOUCH_SIZE := 120.0
 const GRID_MARGIN := 16.0
-const ROW_HEIGHT := 96.0
-## The row label area is split three ways: a thumbnail that previews, the name
-## (which is also the in_song toggle), and a mic button. Thumbnail and mic stay
-## full touch targets, so the name takes what is left (~116px) and clips - the
-## whole label is on the tooltip.
-const ROW_ACTION_SIZE := 88.0
+const CELL_SEPARATION := 4.0
+const HEADER_HEIGHT := 120.0
+const CELL_HEIGHT := 120.0
+## What one animal costs vertically, header + cells. Used to scroll to a row.
+const ROW_HEIGHT := HEADER_HEIGHT + CELL_SEPARATION + CELL_HEIGHT
+## Thumbnail, mic and mute are square touch targets; the name takes what is left
+## of the header line and clips, with the whole text on the tooltip.
+const ROW_ACTION_SIZE := 120.0
 
 ## Mirrors data/ui_theme.json (accent / accent_gold / disabled). These are set
 ## per cell at runtime, which a static theme.tres cannot express.
@@ -120,10 +127,13 @@ func _process(_delta: float) -> void:
 
 # --- Pure helpers (static so the rules are testable without building the UI) ---
 
-## Cell width for a given screen width. Not clamped: the raw number is what
-## section 3b's budget is about, and the caller clamps to MIN_TOUCH_SIZE.
+## Cell width for a given screen width. The cells own the full width now - the
+## row label moved to its own line above them - so only the margins and the
+## inter-cell gaps come off the top. Not clamped: the raw number is what the
+## budget is about, and the caller clamps to MIN_TOUCH_SIZE.
 static func cell_width_for(total_width: float, steps: int) -> float:
-	var usable := total_width - ROW_LABEL_WIDTH - GRID_MARGIN * 2.0
+	var gaps := CELL_SEPARATION * float(maxi(steps - 1, 0))
+	var usable := total_width - GRID_MARGIN * 2.0 - gaps
 	return usable / float(maxi(steps, 1))
 
 
@@ -308,11 +318,7 @@ func _build_title_row() -> HBoxContainer:
 
 func _build_column_header() -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(ROW_LABEL_WIDTH, 0)
-	row.add_child(spacer)
+	row.add_theme_constant_override("separation", int(CELL_SEPARATION))
 
 	_header_labels.clear()
 	for step in _steps():
@@ -348,15 +354,18 @@ func _rebuild_rows() -> void:
 
 
 func _build_row(entity) -> Dictionary:
-	var root := HBoxContainer.new()
-	root.add_theme_constant_override("separation", 4)
-	root.custom_minimum_size = Vector2(0, ROW_HEIGHT)
+	# Two lines: identity and actions on top, the eight steps underneath at full
+	# width. Everything on the header line is a distinct job - the name used to
+	# double as the mute toggle, which meant reading a row's name could silently
+	# park the animal. On a phone that is a bug, not a shortcut.
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", int(CELL_SEPARATION))
 	_rows_box.add_child(root)
 
-	var label_area := HBoxContainer.new()
-	label_area.add_theme_constant_override("separation", 4)
-	label_area.custom_minimum_size = Vector2(ROW_LABEL_WIDTH, ROW_HEIGHT)
-	root.add_child(label_area)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", int(CELL_SEPARATION * 2.0))
+	header.custom_minimum_size = Vector2(0, HEADER_HEIGHT)
+	root.add_child(header)
 
 	# Thumbnail: tap to HEAR the row, without editing it. Hearing an animal is
 	# the fastest identity check there is.
@@ -371,16 +380,15 @@ func _build_row(entity) -> Dictionary:
 		if tex != null:
 			thumb_button.icon = tex
 	thumb_button.pressed.connect(_on_thumb_pressed.bind(entity))
-	label_area.add_child(thumb_button)
+	header.add_child(thumb_button)
 
-	# The name IS the in_song toggle (section 3b) - one tap parks an animal
-	# without deleting it.
-	var label_button := Button.new()
-	label_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label_button.clip_text = true
-	label_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	label_button.pressed.connect(_on_row_label_pressed.bind(entity))
-	label_area.add_child(label_button)
+	# Identity only. Not a button: see the note above.
+	var name_label := Label.new()
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_label.clip_text = true
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(name_label)
 
 	# Record for this animal without leaving the Studio.
 	var mic_button := Button.new()
@@ -388,22 +396,36 @@ func _build_row(entity) -> Dictionary:
 	mic_button.text = "🎤"
 	mic_button.tooltip_text = "Sound aufnehmen"
 	mic_button.pressed.connect(_on_mic_pressed.bind(entity))
-	label_area.add_child(mic_button)
+	header.add_child(mic_button)
+
+	# Park the animal without deleting it - now its own labelled control rather
+	# than a hidden behaviour of the name.
+	var mute_button := Button.new()
+	mute_button.custom_minimum_size = Vector2(ROW_ACTION_SIZE, ROW_ACTION_SIZE)
+	mute_button.tooltip_text = "Stummschalten"
+	mute_button.pressed.connect(_on_row_label_pressed.bind(entity))
+	header.add_child(mute_button)
+
+	var cell_row := HBoxContainer.new()
+	cell_row.add_theme_constant_override("separation", int(CELL_SEPARATION))
+	root.add_child(cell_row)
 
 	var cells: Array[Button] = []
 	for step in _steps():
 		var cell := Button.new()
-		cell.custom_minimum_size = Vector2(_cell_width, ROW_HEIGHT)
+		cell.custom_minimum_size = Vector2(_cell_width, CELL_HEIGHT)
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		cell.pressed.connect(_on_cell_pressed.bind(entity, step))
-		root.add_child(cell)
+		cell_row.add_child(cell)
 		cells.append(cell)
 
 	return {
 		"entity": entity,
 		"root": root,
-		"label_button": label_button,
+		"name_label": name_label,
 		"thumb_button": thumb_button,
 		"mic_button": mic_button,
+		"mute_button": mute_button,
 		"cells": cells,
 	}
 
@@ -455,16 +477,24 @@ func _row_names() -> Array:
 func _refresh_row_label(row: Dictionary, fully_capped: bool, name: String) -> void:
 	var entity = row["entity"]
 	var text := name
-	# The name button is ~116px and clips; the tooltip carries the whole thing.
-	row["label_button"].tooltip_text = text
+	# The name clips to whatever the header line has left; the tooltip carries
+	# the whole thing.
+	var label: Label = row["name_label"]
+	label.tooltip_text = text
 	if not entity.in_song:
 		text += "  (pausiert)"
 	elif fully_capped:
 		text += "  (übertönt)"
 	if entity.id == _focus_entity_id:
 		text = "▸ " + text
-	var button: Button = row["label_button"]
-	button.text = text
+	label.text = text
+	# The mute button states what it will do next, not what is true now: a
+	# control labelled with its own current state reads as a status light.
+	# Words, not symbols - the theme font has no glyph for the obvious ones
+	# (U+2016, U+25B6) and they rendered as tofu boxes on the deployed build.
+	var mute: Button = row["mute_button"]
+	mute.text = "An" if not entity.in_song else "Aus"
+	mute.tooltip_text = "Wieder mitsingen lassen" if not entity.in_song else "Stummschalten"
 	var root: Control = row["root"]
 	root.modulate.a = PARKED_ROW_ALPHA if not entity.in_song else 1.0
 
@@ -492,7 +522,9 @@ func _update_playhead() -> void:
 	if step == _last_step:
 		return
 	_last_step = step
-	_playhead.position = Vector2(ROW_LABEL_WIDTH + float(step) * (_cell_width + 4.0), 0.0)
+	# The cells start at the left edge of the grid area now, so the playhead has
+	# no label column to skip past.
+	_playhead.position = Vector2(float(step) * (_cell_width + CELL_SEPARATION), 0.0)
 	_playhead.size = Vector2(_cell_width, _grid_area.size.y)
 
 
@@ -509,7 +541,7 @@ func _scroll_to_focus() -> void:
 		return
 	var index := row_index_of(_focus_entity_id)
 	if index >= 0:
-		_scroll.scroll_vertical = int(float(index) * (ROW_HEIGHT + 4.0))
+		_scroll.scroll_vertical = int(float(index) * (ROW_HEIGHT + CELL_SEPARATION))
 
 
 ## The width the grid divides between the row labels and the cells. Falls back

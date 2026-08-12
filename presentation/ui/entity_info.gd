@@ -13,6 +13,9 @@ signal studio_requested(entity: EntityData)
 ## the grid can never disagree about what an animal sings.
 const _CompositionView = preload("res://presentation/ui/composition_view.gd")
 
+## See ShopPanel.MIN_TOUCH_SIZE for why 120.
+const MIN_TOUCH_SIZE := 120.0
+
 var _entity: EntityData
 var _zoo_state: ZooState
 
@@ -32,9 +35,14 @@ func _ready() -> void:
 	upgrade_button.pressed.connect(_on_upgrade_pressed)
 	keeper_button.pressed.connect(_on_keeper_pressed)
 	close_button.pressed.connect(_on_close_pressed)
+	# The scene-built buttons inherit the theme's default height, which is under
+	# the touch minimum on a phone. See ShopPanel.MIN_TOUCH_SIZE.
+	for btn in [upgrade_button, keeper_button, close_button]:
+		btn.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	# Record button is code-built so the scene file stays untouched (Sprint 16)
 	record_button = Button.new()
 	record_button.text = "Sound aufnehmen"
+	record_button.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	record_button.pressed.connect(_on_record_pressed)
 	var vbox = close_button.get_parent()
 	vbox.add_child(record_button)
@@ -45,6 +53,7 @@ func _ready() -> void:
 	vbox.move_child(beat_label, record_button.get_index())
 	studio_button = Button.new()
 	studio_button.text = "Im Studio öffnen"
+	studio_button.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	studio_button.pressed.connect(_on_studio_pressed)
 	vbox.add_child(studio_button)
 	vbox.move_child(studio_button, close_button.get_index())

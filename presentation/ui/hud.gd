@@ -4,6 +4,13 @@ extends PanelContainer
 ## The Studio is opened from here (plan section 3b) — it is a full screen, not
 ## a bottom sheet, so main.gd owns the view and the HUD only asks for it.
 signal studio_requested()
+## The shop is closable, so it needs a way back. main.gd owns the panel and the
+## save; the HUD only asks.
+signal shop_requested()
+
+## See ShopPanel.MIN_TOUCH_SIZE - a project pixel is about 0.36pt on a phone,
+## so anything under this is below Apple's 44pt touch guideline.
+const MIN_TOUCH_SIZE := 120.0
 
 var _zoo_state: ZooState
 var _displayed_coins: float = 0.0
@@ -13,14 +20,22 @@ var _displayed_coins: float = 0.0
 @onready var boost_label: Label = $VBoxContainer/TopRow/BoostLabel
 @onready var goal_label: Label = $VBoxContainer/GoalLabel
 var studio_button: Button
+var shop_button: Button
 
 
 func _ready() -> void:
 	# Code-built so the scene file stays untouched (same as entity_info's
 	# record button).
+	shop_button = Button.new()
+	shop_button.text = "Shop"
+	shop_button.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
+	shop_button.pressed.connect(func(): shop_requested.emit())
+	$VBoxContainer/TopRow.add_child(shop_button)
+
 	studio_button = Button.new()
 	studio_button.text = "🎵 Studio"
 	studio_button.theme_type_variation = "AccentButton"
+	studio_button.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	studio_button.pressed.connect(func(): studio_requested.emit())
 	$VBoxContainer/TopRow.add_child(studio_button)
 

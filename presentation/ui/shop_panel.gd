@@ -4,6 +4,14 @@ extends PanelContainer
 
 signal entity_purchased(type_id: String, entity: EntityData, sprite_node: Node2D)
 signal entity_tapped(entity_data: EntityData)
+## The panel closed itself. main.gd owns the save, so it persists the new state.
+signal closed()
+
+## Every interactive control is at least this tall. The viewport is 1080 wide
+## against a ~390pt phone screen, so a project pixel is about 0.36pt: the old
+## 60px buttons landed near 22pt, half of Apple's 44pt minimum, and four-device
+## testing found them genuinely hard to hit.
+const MIN_TOUCH_SIZE := 120.0
 
 var _zoo_state: ZooState
 var _zoo_map: Node2D
@@ -12,6 +20,12 @@ var _locked_labels: Dictionary = {}  # type_id → Label
 
 const EntitySpriteScene = preload("res://scenes/entity_sprite.tscn")
 
+@onready var _close_button: Button = $VBoxContainer/HeaderRow/CloseButton
+
+
+func _ready() -> void:
+	_close_button.pressed.connect(close)
+
 
 func setup(zoo_state: ZooState, zoo_map: Node2D) -> void:
 	_zoo_state = zoo_state
@@ -19,7 +33,32 @@ func setup(zoo_state: ZooState, zoo_map: Node2D) -> void:
 	_rebuild_shop()
 
 
+func open() -> void:
+	visible = true
+	# Hidden panels skip their refresh, so catch up before being seen rather
+	# than showing one frame of stale prices.
+	_refresh()
+
+
+func close() -> void:
+	visible = false
+	closed.emit()
+
+
+func is_open() -> bool:
+	return visible
+
+
 func _process(_delta: float) -> void:
+	# A hidden shop still had a Control in the tree ticking every frame, walking
+	# every buyable type and every locked milestone to recompute text nobody was
+	# looking at. Cheap per frame, pointless while closed.
+	if not visible:
+		return
+	_refresh()
+
+
+func _refresh() -> void:
 	if _zoo_state == null:
 		return
 	_update_button_states()
@@ -41,7 +80,7 @@ func _rebuild_shop() -> void:
 		if cfg.is_empty():
 			continue
 		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(0, 60)
+		btn.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 		btn.pressed.connect(_on_buy_pressed.bind(type_id))
 		btn.button_down.connect(_on_button_down.bind(btn))
 		btn.button_up.connect(_on_button_up.bind(btn))

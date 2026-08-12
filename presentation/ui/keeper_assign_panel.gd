@@ -35,7 +35,8 @@ func _ready() -> void:
 	var faces: Array = keeper_cfg.get("faces", [])
 	for i in range(faces.size()):
 		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(50, 50)
+		# 50px was ~18pt on a phone. See ShopPanel.MIN_TOUCH_SIZE.
+		btn.custom_minimum_size = Vector2(120, 120)
 		btn.text = "👤%d" % (i + 1)
 		btn.pressed.connect(_on_face_selected.bind(i))
 		face_container.add_child(btn)

@@ -58,9 +58,12 @@ func _add(type_id: String, id_hint: String = "") -> EntityData:
 # --- Space budget (section 3b) ---
 
 func test_cells_clear_the_touch_minimum_at_eight_steps() -> void:
+	# The cells own the full width since the row label moved to its own line.
+	# The previous budget shared 1080 with a 300px label column and produced
+	# ~93px cells, which four-device testing found genuinely hard to hit.
 	var width := ViewScript.cell_width_for(1080.0, 8)
-	assert_gt(width, ViewScript.MIN_TOUCH_SIZE, "8 cells fit above the 88px touch minimum")
-	assert_lt(width, 120.0, "and the budget is not wildly generous either")
+	assert_gt(width, ViewScript.MIN_TOUCH_SIZE, "8 cells clear the 120px touch minimum")
+	assert_lt(width, 160.0, "and the budget is not wildly generous either")
 
 
 func test_sixteen_steps_would_break_the_touch_minimum() -> void:
@@ -135,7 +138,7 @@ func test_every_row_of_the_same_type_is_distinguishable() -> void:
 	_view.open()
 	var seen := {}
 	for row in _view._rows:
-		var text: String = row["label_button"].text
+		var text: String = row["name_label"].text
 		assert_false(seen.has(text), "row label '%s' is unique" % text)
 		seen[text] = true
 
@@ -146,8 +149,8 @@ func test_a_recorded_row_shows_its_sound_label() -> void:
 	pcm.resize(200)
 	e.sound_ref = _state.sound_bank.add_sound(WavUtils.build_wav(pcm, 22050, 1), "Opas Lachen")
 	_view.open()
-	assert_eq(_view._rows[0]["label_button"].text, "Opas Lachen", "the row is named by its recording")
-	assert_eq(_view._rows[0]["label_button"].tooltip_text, "Opas Lachen", "and the full text is on the tooltip")
+	assert_eq(_view._rows[0]["name_label"].text, "Opas Lachen", "the row is named by its recording")
+	assert_eq(_view._rows[0]["name_label"].tooltip_text, "Opas Lachen", "and the full text is on the tooltip")
 
 
 func test_unique_labels_numbers_a_colliding_group() -> void:
@@ -175,8 +178,8 @@ func test_two_animals_sharing_a_sound_label_stay_distinguishable() -> void:
 	first.sound_ref = _state.sound_bank.add_sound(wav, "Sound fuer Katze")
 	second.sound_ref = _state.sound_bank.add_sound(wav, "Sound fuer Katze")
 	_view.open()
-	var a: String = _view._rows[0]["label_button"].text
-	var b: String = _view._rows[1]["label_button"].text
+	var a: String = _view._rows[0]["name_label"].text
+	var b: String = _view._rows[1]["name_label"].text
 	assert_ne(a, b, "the two rows do not read the same")
 	assert_true(a.begins_with("Sound fuer Katze"), "both still carry the label the player gave")
 	assert_true(b.begins_with("Sound fuer Katze"), "and so does the other one")
@@ -219,12 +222,12 @@ func test_refresh_picks_up_a_recording_made_elsewhere() -> void:
 	var e = _add("chicken")
 	_add("chicken")
 	_view.open()
-	assert_eq(_view._rows[0]["label_button"].text, "Huhn 1", "unrecorded to start with")
+	assert_eq(_view._rows[0]["name_label"].text, "Huhn 1", "unrecorded to start with")
 	var pcm := PackedByteArray()
 	pcm.resize(200)
 	e.sound_ref = _state.sound_bank.add_sound(WavUtils.build_wav(pcm, 22050, 1), "Wuff")
 	_view.refresh()
-	assert_eq(_view._rows[0]["label_button"].text, "Wuff", "renamed and sorted to the top")
+	assert_eq(_view._rows[0]["name_label"].text, "Wuff", "renamed and sorted to the top")
 
 
 func test_refresh_while_closed_does_nothing() -> void:
@@ -242,12 +245,15 @@ func test_row_actions_are_full_touch_targets() -> void:
 	assert_gt(mic.custom_minimum_size.y, ViewScript.MIN_TOUCH_SIZE - 1.0, "so is the mic button")
 
 
-func test_row_actions_still_leave_room_for_the_cells() -> void:
-	# Thumbnail + name + mic have to fit inside the 300px label budget, or the
-	# cells drop under the touch minimum and section 3b's budget is broken.
-	var name_width := ViewScript.ROW_LABEL_WIDTH - ViewScript.ROW_ACTION_SIZE * 2.0
+func test_row_actions_still_leave_room_for_the_name() -> void:
+	# The header line carries three square touch targets - thumbnail, mic, mute -
+	# and the name takes what is left. If that slice ever collapses the row
+	# becomes unidentifiable, which is the problem the row names exist to solve.
+	var actions := ViewScript.ROW_ACTION_SIZE * 3.0
+	var name_width := 1080.0 - ViewScript.GRID_MARGIN * 2.0 - actions
 	assert_gt(name_width, 100.0, "the name still gets a readable slice")
-	assert_gt(ViewScript.cell_width_for(1080.0, 8), ViewScript.MIN_TOUCH_SIZE, "and the cells are untouched")
+	assert_gt(ViewScript.cell_width_for(1080.0, 8), ViewScript.MIN_TOUCH_SIZE,
+		"and the cells, on their own line, are unaffected by the header")
 
 
 # --- Capped-out marking (section 3b: dropped rows must be visible) ---
@@ -403,7 +409,7 @@ func test_edits_made_in_the_studio_survive_save_and_load() -> void:
 	var chicken = _add("chicken")
 	_view.open()
 	_view._rows[0]["cells"][6].pressed.emit()       # add step 7
-	_view._rows[0]["label_button"].pressed.emit()   # park it
+	_view._rows[0]["mute_button"].pressed.emit()    # park it
 	var edited_pattern: int = chicken.beat_pattern
 
 	var restored = ZooState.new()
@@ -416,15 +422,25 @@ func test_edits_made_in_the_studio_survive_save_and_load() -> void:
 	assert_eq(restored.apply_rhythm_defaults(RHYTHM_CFG), 0, "a hand-edited zoo is never re-defaulted")
 
 
-func test_row_label_parks_and_unparks_the_animal() -> void:
+func test_mute_button_parks_and_unparks_the_animal() -> void:
+	# Muting used to live on the row's NAME, so reading a row could park the
+	# animal by accident - on a phone that is a bug, not a shortcut. It is its
+	# own labelled control now, and the name is inert.
 	var chicken = _add("chicken")
 	_view.open()
-	_view._rows[0]["label_button"].pressed.emit()
-	assert_false(chicken.in_song, "the row label IS the mute button")
-	assert_true(_view._rows[0]["label_button"].text.contains("pausiert"), "and the row says so")
-	_view._rows[0]["label_button"].pressed.emit()
+	_view._rows[0]["mute_button"].pressed.emit()
+	assert_false(chicken.in_song, "the mute button parks it")
+	assert_true(_view._rows[0]["name_label"].text.contains("pausiert"), "and the row says so")
+	_view._rows[0]["mute_button"].pressed.emit()
 	assert_true(chicken.in_song, "tapping again brings it back")
 	assert_eq(_player.previews.size(), 1, "un-parking previews, parking does not")
+
+
+func test_the_row_name_is_not_a_control() -> void:
+	# The whole point of the split: tapping a name must not change the song.
+	_add("chicken")
+	_view.open()
+	assert_false(_view._rows[0]["name_label"] is Button, "the name is a label, not a button")
 
 
 func test_parked_row_is_dimmed() -> void:
@@ -468,9 +484,9 @@ func test_a_never_heard_row_says_so() -> void:
 	_view.open()
 
 	var quiet_row: int = _view.row_index_of(quiet.id)
-	var label: Button = _view._rows[quiet_row]["label_button"]
+	var label: Label = _view._rows[quiet_row]["name_label"]
 	assert_true(label.text.contains("übertönt"), "the drowned-out animal is labelled, not left looking broken")
-	var loud_label: Button = _view._rows[_view.row_index_of(loud.id)]["label_button"]
+	var loud_label: Label = _view._rows[_view.row_index_of(loud.id)]["name_label"]
 	assert_false(loud_label.text.contains("übertönt"), "the audible one is not")
 
 
@@ -497,12 +513,18 @@ func test_playhead_tracks_the_engine() -> void:
 	assert_gt(at_step_2, at_step_0, "and the playhead moved right with it")
 
 
-func test_playhead_starts_after_the_row_labels() -> void:
+func test_playhead_aligns_with_the_cell_columns() -> void:
+	# The cells start at the left edge now, so step 1 puts the playhead at zero
+	# and each further step moves it exactly one cell plus one gap.
 	_add("chicken")
 	_view.open()
 	_state.rhythm.advance_to(0.0)
 	_view._update_playhead()
-	assert_gt(_view._playhead.position.x, ViewScript.ROW_LABEL_WIDTH - 1.0, "the playhead is over the grid, not the labels")
+	assert_almost_eq(_view._playhead.position.x, 0.0, 0.001, "step 1 starts at the first cell")
+	var stride: float = _view._cell_width + ViewScript.CELL_SEPARATION
+	_state.rhythm.advance_to(_state.rhythm.step_duration() * 2.0)
+	_view._update_playhead()
+	assert_almost_eq(_view._playhead.position.x, stride * 2.0, 0.001, "step 3 sits over the third cell")
 
 
 # --- Link-through and live updates ---
@@ -513,7 +535,7 @@ func test_open_marks_the_animal_it_was_opened_for() -> void:
 	_view.open(target.id)
 	var index: int = _view.row_index_of(target.id)
 	assert_gt(float(index), -1.0, "the animal has a row")
-	var label: Button = _view._rows[index]["label_button"]
+	var label: Label = _view._rows[index]["name_label"]
 	assert_true(label.text.begins_with("▸"), "and it is marked so the scroll target is obvious")
 
 

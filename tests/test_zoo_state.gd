@@ -34,6 +34,38 @@ func test_entity_data_defaults() -> void:
 	assert_eq(e.level, 1, "level defaults to 1")
 
 
+## --- Persisted UI state ---
+
+func test_a_fresh_zoo_starts_with_the_shop_closed() -> void:
+	# The zoo should be the first thing a new guest sees, not the store - the
+	# shop panel covers the lower third of the map.
+	var state = ZooState.new()
+	assert_false(state.shop_open, "closed on a fresh save")
+	assert_false(state.studio_hint_seen, "and the Studio hint has not been used up")
+
+
+func test_shop_and_hint_state_survive_a_save() -> void:
+	var state = ZooState.new()
+	state.shop_open = true
+	state.studio_hint_seen = true
+	var restored = ZooState.new()
+	restored.from_dict(state.to_dict())
+	assert_true(restored.shop_open, "a guest who left the shop open gets it back")
+	assert_true(restored.studio_hint_seen, "and is not nudged toward the Studio twice")
+
+
+func test_a_save_written_before_these_existed_still_loads() -> void:
+	# Every save on a device right now predates both fields.
+	var state = ZooState.new()
+	var old_save: Dictionary = state.to_dict()
+	old_save.erase("shop_open")
+	old_save.erase("studio_hint_seen")
+	var restored = ZooState.new()
+	restored.from_dict(old_save)
+	assert_false(restored.shop_open, "an older save opens on the zoo")
+	assert_false(restored.studio_hint_seen, "and is still offered the hint once")
+
+
 func test_zoo_state_empty_roundtrip() -> void:
 	var state = ZooState.new()
 	var d = state.to_dict()

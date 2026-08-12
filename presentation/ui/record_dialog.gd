@@ -7,6 +7,10 @@ extends PanelContainer
 signal sound_saved(sound_id: String)
 
 const MAX_SECONDS := 10.0
+## See ShopPanel.MIN_TOUCH_SIZE for why 120. The hold-to-record button gets more
+## than the minimum: it is the one control a guest has to hit while talking.
+const MIN_TOUCH_SIZE := 120.0
+const RECORD_BUTTON_HEIGHT := 160.0
 
 var _recorder: AudioRecorderBase
 var _bank
@@ -72,12 +76,14 @@ func build() -> void:
 	mic_label.text = "Mikrofon:"
 	mic_row.add_child(mic_label)
 	_mic_picker = OptionButton.new()
+	_mic_picker.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	_mic_picker.item_selected.connect(_on_mic_selected)
 	mic_row.add_child(_mic_picker)
 
 	_record_button = Button.new()
 	_record_button.text = "Gedrückt halten zum Aufnehmen"
 	_record_button.theme_type_variation = "AccentButton"
+	_record_button.custom_minimum_size = Vector2(0, RECORD_BUTTON_HEIGHT)
 	_record_button.button_down.connect(_on_record_down)
 	_record_button.button_up.connect(_on_record_up)
 	vbox.add_child(_record_button)
@@ -89,17 +95,20 @@ func build() -> void:
 
 	_play_button = Button.new()
 	_play_button.text = "Anhören"
+	_play_button.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	_play_button.pressed.connect(_on_play_pressed)
 	row.add_child(_play_button)
 
 	_save_button = Button.new()
 	_save_button.text = "Speichern"
+	_save_button.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	_save_button.pressed.connect(_on_save_pressed)
 	row.add_child(_save_button)
 
 	_discard_button = Button.new()
 	_discard_button.text = "Abbrechen"
 	_discard_button.theme_type_variation = "GhostButton"
+	_discard_button.custom_minimum_size = Vector2(0, MIN_TOUCH_SIZE)
 	_discard_button.pressed.connect(_on_discard_pressed)
 	row.add_child(_discard_button)
 
