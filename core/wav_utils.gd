@@ -16,11 +16,18 @@ const DEFAULT_TRIM_RATIO := 0.05
 const DEFAULT_TRIM_LEAD_MS := 10.0
 ## Fade applied at a length cap so the cut lands as an ending, not a click.
 const DEFAULT_FADE_MS := 30.0
-## Loudness every voice in the zoo is matched to, as RMS (0..1). Measured from
-## assets/placeholder_sounds with tools/diag_loudness.gd: the thirteen shipped
-## sounds run 0.145 to 0.204 RMS, mean 0.185. A recording matched to this sits
-## at the same perceived level as the animal it replaces.
-const DEFAULT_TARGET_RMS := 0.185
+## Loudness every user recording is brought to, as RMS (0..1).
+##
+## The placeholder sounds measure 0.145..0.204 RMS, mean 0.185 (measured from
+## assets/placeholder_sounds). This target sits deliberately ABOVE them, for a
+## reason that only showed up on a device: the placeholders are short, aggressive
+## bursts whose energy is packed into a fraction of a second, while a recorded
+## phrase spreads its energy over the whole capture. Matched on file RMS, the two
+## measure the same and the burst still wins the moment it fires.
+##
+## A guest's voice is the point of the gift, so it is levelled to sit on top of
+## the animal it replaces rather than merely alongside it.
+const DEFAULT_TARGET_RMS := 0.24
 
 
 ## Parses RIFF/fmt/data chunks. Returns {} if the blob is not a WAV.

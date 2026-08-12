@@ -110,10 +110,13 @@ func test_matching_rejects_a_non_wav() -> void:
 	assert_eq(WavUtils.match_loudness(garbage, 0.185).size(), 0, "not a WAV, nothing back")
 
 
-func test_the_default_target_matches_the_shipped_sounds() -> void:
-	# Measured with tools/diag_loudness.gd: the placeholders run 0.145..0.204.
-	assert_gt(WavUtils.DEFAULT_TARGET_RMS, 0.14, "not below the quietest placeholder")
-	assert_lt(WavUtils.DEFAULT_TARGET_RMS, 0.21, "not above the loudest")
+func test_the_default_target_sits_above_the_shipped_sounds() -> void:
+	# The placeholders measure 0.145..0.204 RMS, mean 0.185. The target is above
+	# all of them on purpose: they are short aggressive bursts and a spoken
+	# phrase spreads the same energy over a whole second, so matching them
+	# exactly still leaves the burst winning the moment it fires.
+	assert_gt(WavUtils.DEFAULT_TARGET_RMS, 0.204, "above the loudest placeholder")
+	assert_lt(WavUtils.DEFAULT_TARGET_RMS, 0.35, "but not so loud it can only be limiter mush")
 
 
 func test_build_parse_roundtrip() -> void:

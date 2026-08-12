@@ -36,6 +36,31 @@ func _init(zoo_state) -> void:
 	_zoo_state = zoo_state
 
 
+## How far the built-in animal sounds are held below a guest's recording.
+##
+## Levelling the recordings alone was not enough: the placeholders are short,
+## aggressive bursts, so even at a matched RMS they punch through a spoken phrase
+## that spreads the same energy over a second. Rather than re-cutting the shipped
+## audio, the placeholders simply play quieter - a zoo of recordings is unchanged
+## by this, and a mixed zoo puts the voices in front, which is the point.
+const PLACEHOLDER_TRIM_DB := -5.0
+
+
+## Playback level for this animal, in dB. 0 for a guest's own recording, trimmed
+## for a built-in sound. Callers set it on the player alongside the stream.
+func volume_db_for(entity) -> float:
+	return 0.0 if has_user_recording(entity) else PLACEHOLDER_TRIM_DB
+
+
+## True when this animal will actually play a recording - it has a sound_ref AND
+## the bytes are loaded. A metadata-only entry falls back to the placeholder, so
+## asking about sound_ref alone would over-report.
+func has_user_recording(entity) -> bool:
+	if entity == null or _zoo_state == null or entity.sound_ref == "":
+		return false
+	return _zoo_state.sound_bank.get_bytes(entity.sound_ref).size() > 0
+
+
 func resolve_entity_stream(entity, cfg: Dictionary) -> AudioStream:
 	if entity != null and entity.sound_ref != "" and _zoo_state != null:
 		var bytes: PackedByteArray = _zoo_state.sound_bank.get_bytes(entity.sound_ref)

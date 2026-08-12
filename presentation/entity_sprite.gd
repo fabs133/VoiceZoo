@@ -189,6 +189,10 @@ func _apply_resolved_sound(cfg: Dictionary) -> void:
 			snd = load(path)
 	if snd:
 		_beat_audio.stream = snd
+		# A guest's recording plays at full level; the built-in bursts sit under
+		# it. See SoundResolver.PLACEHOLDER_TRIM_DB.
+		if sound_resolver != null:
+			_beat_audio.volume_db = sound_resolver.volume_db_for(entity_data)
 
 
 func update_level_display() -> void:

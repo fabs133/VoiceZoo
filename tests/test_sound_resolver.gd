@@ -72,6 +72,33 @@ func test_levelling_can_be_switched_off() -> void:
 		"0 leaves the take exactly as captured")
 
 
+func test_a_recording_plays_louder_than_a_placeholder() -> void:
+	# Levelling the recordings was not enough on a device: the built-in sounds
+	# are short aggressive bursts and punched through a spoken phrase carrying
+	# the same measured energy. They play under it now.
+	var without: float = _resolver.volume_db_for(_entity)
+	_entity.sound_ref = _state.sound_bank.add_sound(_peaky_wav(0.9), "meine Stimme")
+	var with_recording: float = _resolver.volume_db_for(_entity)
+	assert_lt(without, with_recording, "the built-in sound sits below the guest's voice")
+	assert_almost_eq(with_recording, 0.0, 0.001, "and the recording plays at full level")
+
+
+func test_a_metadata_only_entry_counts_as_no_recording() -> void:
+	# Bytes not loaded means the placeholder is what will actually play, so it
+	# must be trimmed like one rather than left at recording level.
+	_state.sound_bank.add_sound(_wav(), "user")
+	var restored = ZooState.new()
+	restored.from_dict(_state.to_dict())
+	var resolver = ResolverScript.new(restored)
+	var entity = EntityData.new()
+	entity.id = "0"
+	entity.type_id = "chicken"
+	entity.sound_ref = "snd_1"
+	assert_false(resolver.has_user_recording(entity), "a ref without bytes is not a recording")
+	assert_almost_eq(resolver.volume_db_for(entity), ResolverScript.PLACEHOLDER_TRIM_DB, 0.001,
+		"so it plays at the placeholder level")
+
+
 func test_user_recording_wins() -> void:
 	var id = _state.sound_bank.add_sound(_wav(32000), "user")
 	_entity.sound_ref = id

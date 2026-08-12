@@ -206,12 +206,18 @@ func _setup_master_bus() -> void:
 	if AudioServer.get_bus_effect_count(master) > 0:
 		return
 
+	# Gentle. A compressor on a shared bus ducks EVERYTHING when anything on it
+	# gets loud, so the earlier -18 dB / 4:1 setting had the placeholders' short
+	# aggressive bursts pulling a guest's recording down for a quarter second
+	# every time one fired - which is precisely the "the default sounds
+	# overshadow my recording" report. Higher threshold, gentler ratio and a
+	# quicker recovery keep the glue without the ducking.
 	var comp := AudioEffectCompressor.new()
-	comp.threshold = -18.0
-	comp.ratio = 4.0
+	comp.threshold = -10.0
+	comp.ratio = 2.0
 	comp.attack_us = 20.0
-	comp.release_ms = 250.0
-	comp.gain = 6.0
+	comp.release_ms = 150.0
+	comp.gain = 3.0
 	AudioServer.add_bus_effect(master, comp)
 
 	# AudioEffectHardLimiter is the 4.3+ replacement; fall back where it is not
