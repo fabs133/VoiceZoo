@@ -129,6 +129,10 @@ func _ready() -> void:
 	# Respawn saved entities on map
 	_respawn_entities()
 
+	# A returning player with animals but no hint yet gets it too, not only
+	# someone starting from an empty zoo.
+	_maybe_arm_studio_hint()
+
 
 func _process(delta: float) -> void:
 	if zoo_state == null:
@@ -248,12 +252,7 @@ func _on_entity_purchased(_type_id: String, entity: EntityData, sprite_node: Nod
 	_entity_sprites[entity.id] = sprite_node
 	# A new animal needs a part in the song, rotated off the ones already owned.
 	zoo_state.apply_rhythm_defaults(Config.get_rhythm_config())
-	# Three first-time testers all found the idle loop and only one found the
-	# composer, so the FIRST animal earns one nudge toward it. Armed here rather
-	# than at launch: before there is an animal the Studio is empty and "deine
-	# Tiere bekommen deine Stimme" promises nothing.
-	if not zoo_state.studio_hint_seen and zoo_state.entities.size() == 1:
-		studio_hint.start(hud.studio_button)
+	_maybe_arm_studio_hint()
 
 
 func _on_entity_sprite_tapped(sprite: Node2D) -> void:
@@ -311,6 +310,22 @@ func _on_studio_requested() -> void:
 	if studio_hint != null and studio_hint.is_showing():
 		studio_hint.dismiss()
 	composition_view.open()
+
+
+## Three first-time testers all found the idle loop and only one found the
+## composer, so a zoo with at least one animal in it earns one nudge toward the
+## Studio. The condition is "has an animal and has not been told", NOT "just
+## bought their first": anyone already carrying a save - every device tested so
+## far - has more than one animal and would otherwise never be shown it.
+##
+## Not armed when the zoo is empty: the Studio has nothing in it then, and
+## "deine Tiere bekommen deine Stimme" promises nothing.
+func _maybe_arm_studio_hint() -> void:
+	if zoo_state.studio_hint_seen or studio_hint == null:
+		return
+	if zoo_state.entities.is_empty() or studio_hint.is_armed():
+		return
+	studio_hint.start(hud.studio_button)
 
 
 ## Shown once per save, whether it was tapped, answered or simply timed out.

@@ -24,6 +24,54 @@ func _wav(rate: int = 32000) -> PackedByteArray:
 	return WavUtils.build_wav(pcm, rate, 1)
 
 
+## A take shaped like speech: sparse loud transients over a quiet body, giving a
+## crest factor near 10 - roughly what a voice measures, and about 3.5x peakier
+## than the shipped placeholder sounds.
+func _peaky_wav(peak: float, seconds: float = 0.4, rate: int = 22050) -> PackedByteArray:
+	var n := int(seconds * float(rate))
+	var pcm := PackedByteArray()
+	pcm.resize(n * 2)
+	for i in n:
+		var envelope: float = peak if i % 50 == 0 else peak * 0.05
+		var s: float = sin(TAU * 220.0 * float(i) / float(rate)) * envelope
+		pcm.encode_s16(i * 2, clampi(int(s * 32767.0), -32768, 32767))
+	return WavUtils.build_wav(pcm, rate, 1)
+
+
+func test_a_recording_is_levelled_to_the_shared_loudness() -> void:
+	# The reported problem: recordings sat quietly under the placeholder sounds
+	# they replaced, because both were normalized by PEAK and a voice carries far
+	# less loudness at the same peak. The resolver levels by RMS on the way out.
+	var quiet := _peaky_wav(0.9)
+	_entity.sound_ref = _state.sound_bank.add_sound(quiet, "leise")
+	var stream = _resolver.resolve_entity_stream(_entity, {"default_sound": PLACEHOLDER})
+	var played := WavUtils.build_wav(stream.data, int(stream.mix_rate), 1)
+	assert_gt(WavUtils.get_rms(played), WavUtils.get_rms(quiet) * 1.5, "it comes out louder")
+	assert_almost_eq(WavUtils.get_rms(played), WavUtils.DEFAULT_TARGET_RMS, 0.03,
+		"at the level the placeholder sounds sit at")
+
+
+func test_levelling_leaves_the_stored_recording_untouched() -> void:
+	# The bank keeps what was captured. Levelling happens on the way to playback
+	# so the target can be changed later and every existing sound re-levels.
+	var original := _peaky_wav(0.9)
+	_entity.sound_ref = _state.sound_bank.add_sound(original, "leise")
+	_resolver.resolve_entity_stream(_entity, {})
+	_resolver.resolve_entity_stream(_entity, {})
+	assert_eq(_state.sound_bank.get_bytes(_entity.sound_ref), original,
+		"repeated resolves never compound onto the stored bytes")
+
+
+func test_levelling_can_be_switched_off() -> void:
+	var original := _peaky_wav(0.9)
+	_entity.sound_ref = _state.sound_bank.add_sound(original, "leise")
+	_resolver.target_rms = 0.0
+	var stream = _resolver.resolve_entity_stream(_entity, {})
+	var played := WavUtils.build_wav(stream.data, int(stream.mix_rate), 1)
+	assert_almost_eq(WavUtils.get_rms(played), WavUtils.get_rms(original), 0.001,
+		"0 leaves the take exactly as captured")
+
+
 func test_user_recording_wins() -> void:
 	var id = _state.sound_bank.add_sound(_wav(32000), "user")
 	_entity.sound_ref = id

@@ -8,6 +8,114 @@ func _pcm(n: int = 200) -> PackedByteArray:
 	return b
 
 
+## A steady tone at a given amplitude - crest factor ~1.41, like the shipped
+## placeholder sounds.
+func _tone(amplitude: float, seconds: float = 0.5, rate: int = 22050) -> PackedByteArray:
+	var n := int(seconds * float(rate))
+	var pcm := PackedByteArray()
+	pcm.resize(n * 2)
+	for i in n:
+		var s: float = sin(TAU * 220.0 * float(i) / float(rate)) * amplitude
+		pcm.encode_s16(i * 2, clampi(int(s * 32767.0), -32768, 32767))
+	return WavUtils.build_wav(pcm, rate, 1)
+
+
+## Peaky like speech: brief loud bursts over a quiet body, so the peak is high
+## and the RMS is low. This is the shape that made recordings sound quiet.
+func _peaky(peak: float, seconds: float = 0.5, rate: int = 22050) -> PackedByteArray:
+	var n := int(seconds * float(rate))
+	var pcm := PackedByteArray()
+	pcm.resize(n * 2)
+	for i in n:
+		# One sample in twenty carries the peak; the rest sit far below it.
+		var envelope: float = peak if i % 20 == 0 else peak * 0.08
+		var s: float = sin(TAU * 220.0 * float(i) / float(rate)) * envelope
+		pcm.encode_s16(i * 2, clampi(int(s * 32767.0), -32768, 32767))
+	return WavUtils.build_wav(pcm, rate, 1)
+
+
+# --- Loudness matching ---
+
+func test_rms_is_lower_than_peak_for_a_peaky_take() -> void:
+	# The measurement the whole feature rests on: peak says nothing about
+	# loudness. A voice and a placeholder can share a peak and be far apart.
+	var speechy := _peaky(0.9)
+	assert_gt(WavUtils.get_peak(speechy), 0.85, "the peak is high")
+	assert_lt(WavUtils.get_rms(speechy), 0.25, "and the loudness is not")
+
+
+func test_a_quiet_take_is_brought_up_to_the_target() -> void:
+	# A take as it reaches the resolver: prepare_take has already peak-normalized
+	# it, so it is quiet in RMS rather than quiet outright.
+	var quiet := _tone(0.1)
+	var matched := WavUtils.match_loudness(quiet, 0.185)
+	assert_almost_eq(WavUtils.get_rms(matched), 0.185, 0.02, "lifted to the shared level")
+
+
+func test_the_boost_is_capped() -> void:
+	# A recording of a silent room must not be dragged up to full loudness -
+	# there is nothing in it but noise, and 8x is already generous for anything
+	# that survived prepare_take's peak normalization.
+	var almost_nothing := _tone(0.01)
+	var matched := WavUtils.match_loudness(almost_nothing, 0.185)
+	var ratio := WavUtils.get_rms(matched) / WavUtils.get_rms(almost_nothing)
+	assert_lt(ratio, 8.5, "the gain is clamped rather than unbounded")
+	assert_lt(WavUtils.get_rms(matched), 0.185, "so it does not reach the target, by design")
+
+
+func test_a_loud_take_is_brought_down_to_the_target() -> void:
+	# Matching, not maximizing: a shouted recording must not tower over the zoo.
+	var loud := _tone(0.9)
+	var matched := WavUtils.match_loudness(loud, 0.185)
+	assert_lt(WavUtils.get_rms(matched), WavUtils.get_rms(loud), "pulled down")
+	assert_almost_eq(WavUtils.get_rms(matched), 0.185, 0.02, "to the same shared level")
+
+
+func test_a_peaky_take_ends_up_as_loud_as_a_steady_one() -> void:
+	# The actual complaint: a recording sitting quietly under the placeholders.
+	var placeholder := _tone(0.26)  # ~0.185 RMS, like the shipped sounds
+	var recording := WavUtils.match_loudness(_peaky(0.9), 0.185)
+	assert_almost_eq(WavUtils.get_rms(recording), WavUtils.get_rms(placeholder), 0.03,
+		"the recording and the animal it replaces sit at the same level")
+
+
+func test_matching_does_not_clip() -> void:
+	# Boosting a peaky take to a shared loudness pushes its transients past full
+	# scale. They have to round off, not turn into buzz.
+	var matched := WavUtils.match_loudness(_peaky(0.5), 0.185)
+	assert_lt(WavUtils.get_peak(matched), 1.0, "nothing reaches full scale")
+
+
+func test_near_silence_is_left_alone() -> void:
+	# A failed recording is not a soft one; boosting it 8x only raises hiss.
+	var silence := WavUtils.build_wav(_pcm(4000), 22050, 1)
+	var matched := WavUtils.match_loudness(silence, 0.185)
+	assert_eq(matched, silence, "returned untouched")
+
+
+func test_a_take_already_at_the_target_is_untouched() -> void:
+	var already := _tone(0.26)
+	assert_eq(WavUtils.match_loudness(already, WavUtils.get_rms(already)), already,
+		"no needless rewrite of the PCM")
+
+
+func test_matching_is_disabled_by_a_zero_target() -> void:
+	var tone := _tone(0.5)
+	assert_eq(WavUtils.match_loudness(tone, 0.0), tone, "0 means leave it alone")
+
+
+func test_matching_rejects_a_non_wav() -> void:
+	var garbage := PackedByteArray()
+	garbage.resize(50)
+	assert_eq(WavUtils.match_loudness(garbage, 0.185).size(), 0, "not a WAV, nothing back")
+
+
+func test_the_default_target_matches_the_shipped_sounds() -> void:
+	# Measured with tools/diag_loudness.gd: the placeholders run 0.145..0.204.
+	assert_gt(WavUtils.DEFAULT_TARGET_RMS, 0.14, "not below the quietest placeholder")
+	assert_lt(WavUtils.DEFAULT_TARGET_RMS, 0.21, "not above the loudest")
+
+
 func test_build_parse_roundtrip() -> void:
 	var wav = WavUtils.build_wav(_pcm(400), 22050, 1)
 	var h = WavUtils.parse_header(wav)

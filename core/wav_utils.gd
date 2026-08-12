@@ -16,6 +16,11 @@ const DEFAULT_TRIM_RATIO := 0.05
 const DEFAULT_TRIM_LEAD_MS := 10.0
 ## Fade applied at a length cap so the cut lands as an ending, not a click.
 const DEFAULT_FADE_MS := 30.0
+## Loudness every voice in the zoo is matched to, as RMS (0..1). Measured from
+## assets/placeholder_sounds with tools/diag_loudness.gd: the thirteen shipped
+## sounds run 0.145 to 0.204 RMS, mean 0.185. A recording matched to this sits
+## at the same perceived level as the animal it replaces.
+const DEFAULT_TARGET_RMS := 0.185
 
 
 ## Parses RIFF/fmt/data chunks. Returns {} if the blob is not a WAV.
@@ -282,6 +287,108 @@ static func normalize_wav(bytes: PackedByteArray, target_peak: float = 0.9) -> P
 	while pos < end:
 		var v := int(roundf(float(_s16(bytes, pos)) * gain))
 		out.encode_s16(pos, clampi(v, -32768, 32767))
+		pos += 2
+	return out
+
+
+## Root-mean-square level of the PCM, 0.0..1.0 - how loud a take actually
+## SOUNDS, as opposed to get_peak's "how close to clipping is it". Every sample
+## is counted: this runs once when a sprite is handed its stream, not per beat.
+static func get_rms(bytes: PackedByteArray) -> float:
+	var h = parse_header(bytes)
+	if h.is_empty() or h["bits"] != 16:
+		return 0.0
+	var pos: int = h["data_offset"]
+	var end: int = h["data_offset"] + h["data_size"] - 1
+	var sum_sq := 0.0
+	var count := 0
+	while pos < end:
+		var u = bytes[pos] | (bytes[pos + 1] << 8)
+		if u >= 32768:
+			u -= 65536
+		var s := float(u) / 32768.0
+		sum_sq += s * s
+		count += 1
+		pos += 2
+	if count == 0:
+		return 0.0
+	return sqrt(sum_sq / float(count))
+
+
+## Scales a take so its RMS matches target_rms, rounding off whatever that
+## pushes toward the ceiling instead of letting it clip.
+##
+## PEAK IS NOT LOUDNESS, and that is the whole point of this function. Measured
+## from the actual assets: the placeholder sounds sit at ~0.50 peak / ~0.185 RMS
+## (crest ~2.8), while a voice peak-normalized to 0.9 sits at ~0.09 RMS (crest
+## ~10). Nearly twice the peak and half the loudness - which is exactly why a
+## guest's recording sounded quiet next to the animals it was replacing.
+##
+## The gain is clamped both ways, so this pulls a shouted take DOWN as readily
+## as it lifts a whispered one: the goal is that every animal sits at the same
+## level, not that recordings are loud.
+##
+## Peaks above the knee are rounded with a tanh curve rather than clamped. A
+## voice boosted to a shared loudness WILL exceed full scale on its transients;
+## hard clipping turns those into buzz, and on a phone speaker that reads as a
+## broken recording rather than a loud one.
+static func match_loudness(bytes: PackedByteArray, target_rms: float = DEFAULT_TARGET_RMS,
+		ceiling: float = 0.98, max_gain: float = 8.0) -> PackedByteArray:
+	var h = parse_header(bytes)
+	if h.is_empty() or h["bits"] != 16 or h["format"] != 1:
+		return PackedByteArray()
+	var rms := get_rms(bytes)
+	# Near-silence stays near-silent: there is nothing in it to bring up except
+	# the noise floor, and a take this quiet is a failed recording, not a soft one.
+	if rms < 0.0005 or target_rms <= 0.0:
+		return bytes
+	var wanted: float = clampf(target_rms / rms, 1.0 / max_gain, max_gain)
+	if absf(wanted - 1.0) <= 0.02:
+		return bytes
+
+	# Turning a take DOWN cannot clip, so it needs no limiting and no second look.
+	if wanted < 1.0:
+		return _apply_gain(bytes, wanted, ceiling)
+
+	# Turning it UP does clip, and rounding off the transients costs some of the
+	# loudness the gain was supposed to buy - the more dynamic the take, the more.
+	# So the level is re-measured and topped up, rather than computed once and
+	# hoped for: a single pass leaves a very dynamic voice well short of the
+	# others. Three passes converge without squashing it flat, and the cumulative
+	# gain still cannot exceed max_gain.
+	var out := bytes
+	var applied := 1.0
+	for _pass in 3:
+		var current := get_rms(out)
+		if current < 0.0005:
+			break
+		var step: float = minf(target_rms / current, max_gain / applied)
+		if step <= 1.02:
+			break
+		out = _apply_gain(out, step, ceiling)
+		applied *= step
+	return out
+
+
+## Scales the PCM, rounding anything approaching the ceiling with a tanh curve
+## instead of clamping it. Hard clipping a boosted voice turns its transients
+## into buzz, which on a phone speaker reads as a broken recording.
+static func _apply_gain(bytes: PackedByteArray, gain: float, ceiling: float) -> PackedByteArray:
+	var h = parse_header(bytes)
+	if h.is_empty():
+		return bytes
+	var knee: float = ceiling * 0.7
+	var span: float = maxf(ceiling - knee, 0.0001)
+	var out := bytes.duplicate()
+	var pos: int = h["data_offset"]
+	var end: int = h["data_offset"] + h["data_size"] - 1
+	while pos < end:
+		var s := float(_s16(bytes, pos)) / 32768.0 * gain
+		var a := absf(s)
+		if a > knee:
+			a = knee + span * tanh((a - knee) / span)
+			s = a if s >= 0.0 else -a
+		out.encode_s16(pos, clampi(int(roundf(s * 32767.0)), -32768, 32767))
 		pos += 2
 	return out
 

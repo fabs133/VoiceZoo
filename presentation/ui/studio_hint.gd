@@ -156,6 +156,12 @@ func is_showing() -> bool:
 	return _showing
 
 
+## Counting down or already on screen. Distinct from is_showing(), which is
+## false during the delay - re-arming in that window would restart the wait.
+func is_armed() -> bool:
+	return _target != null and is_processing()
+
+
 func _on_panel_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed:
 		dismiss()
